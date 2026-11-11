@@ -38,29 +38,33 @@ static RECT g_rFw={0,0,0,0};
 static std::wstring g_devHost,g_devCPU,g_devRAM,g_devRes;      // device info
 struct Note{ const wchar_t* ver; const wchar_t* kind; const wchar_t* text; };
 static Note g_notes[]={
-  {L"v1.7",L"FEATURE",L"Start with Windows: hidden in the tray at sign-in (Protection tab)"},
-  {L"v1.7",L"FEATURE",L"Strings scan: links + commands inside flagged unsigned apps"},
-  {L"v1.7",L"FIX",    L"Low idle CPU: signature cache, dashboard repaints on change"},
-  {L"v1.7",L"FEATURE",L"AFK screen: GPU-decoded 4K 60 fps video on its own render thread"},
-  {L"v1.7",L"IMPROVE",L"Source split into core / ui / afk / media-engine modules"},
-  {L"v1.7",L"FIX",    L"AFK screen no longer starved by the dashboard timer (was ~9 fps)"},
-  {L"v1.6",L"FEATURE",L"Token Guard \u2014 warns when unsigned apps read your logins/tokens"},
-  {L"v1.6",L"FEATURE",L"Resizable / scalable window (drag any edge or corner)"},
-  {L"v1.6",L"FIX",    L"Sharper AFK screensaver video (high-quality bicubic upscaling)"},
-  {L"v1.5",L"FEATURE",L"Blue/purple theme, moon icon, hover + press animations"},
-  {L"v1.5",L"FEATURE",L"Scramble tab titles, quote & fun-fact engine w/ config files"},
-  {L"v1.5",L"FIX",    L"Session timer format (no more lu:lu:lu)"},
-  {L"v1.5",L"FIX",    L"Event text no longer bleeds past its card"},
-  {L"v1.5",L"IMPROVE",L"Scan now lists already-running apps (Roblox, Explorer)"},
-  {L"v1.5",L"IMPROVE",L"Signature-based suspicion; signed apps are not flagged"},
-  {L"v1.4",L"FIX",    L"Fixed a render recursion that froze the app"},
-  {L"v1.4",L"FIX",    L"AppData watch storm no longer hangs the UI"},
-  {L"v1.3",L"FEATURE",L"Tabbed dashboard, protection toggles, JSON settings"},
-  {L"v1.2",L"FEATURE",L"AppData file watch, auto-start, cache folder"},
-  {L"v1.1",L"FEATURE",L"Live process watch via WMI event feed"},
-  {L"v1.0",L"FEATURE",L"Autorun watch (Run keys, Startup, Tasks)"},
+  {L"v1.0",L"FEATURE",L"Automatic updates: checked against GitHub, installed when idle"},
+  {L"v1.0",L"FEATURE",L"Windows setup installer (per user, no admin rights)"},
+  {L"v1.0",L"FEATURE",L"Power saving after 30 min away: CPU capped, screen dimmed"},
+  {L"v1.0",L"IMPROVE",L"First public release. Earlier builds were private betas (b1.x)"},
+  {L"b1.7",L"FEATURE",L"Start with Windows: hidden in the tray at sign-in (Protection tab)"},
+  {L"b1.7",L"FEATURE",L"Strings scan: links + commands inside flagged unsigned apps"},
+  {L"b1.7",L"FIX",    L"Low idle CPU: signature cache, dashboard repaints on change"},
+  {L"b1.7",L"FEATURE",L"AFK screen: GPU-decoded 4K 60 fps video on its own render thread"},
+  {L"b1.7",L"IMPROVE",L"Source split into core / ui / afk / media-engine modules"},
+  {L"b1.7",L"FIX",    L"AFK screen no longer starved by the dashboard timer (was ~9 fps)"},
+  {L"b1.6",L"FEATURE",L"Token Guard \u2014 warns when unsigned apps read your logins/tokens"},
+  {L"b1.6",L"FEATURE",L"Resizable / scalable window (drag any edge or corner)"},
+  {L"b1.6",L"FIX",    L"Sharper AFK screensaver video (high-quality bicubic upscaling)"},
+  {L"b1.5",L"FEATURE",L"Blue/purple theme, moon icon, hover + press animations"},
+  {L"b1.5",L"FEATURE",L"Scramble tab titles, quote & fun-fact engine w/ config files"},
+  {L"b1.5",L"FIX",    L"Session timer format (no more lu:lu:lu)"},
+  {L"b1.5",L"FIX",    L"Event text no longer bleeds past its card"},
+  {L"b1.5",L"IMPROVE",L"Scan now lists already-running apps (Roblox, Explorer)"},
+  {L"b1.5",L"IMPROVE",L"Signature-based suspicion; signed apps are not flagged"},
+  {L"b1.4",L"FIX",    L"Fixed a render recursion that froze the app"},
+  {L"b1.4",L"FIX",    L"AppData watch storm no longer hangs the UI"},
+  {L"b1.3",L"FEATURE",L"Tabbed dashboard, protection toggles, JSON settings"},
+  {L"b1.2",L"FEATURE",L"AppData file watch, auto-start, cache folder"},
+  {L"b1.1",L"FEATURE",L"Live process watch via WMI event feed"},
+  {L"b1.0",L"FEATURE",L"Autorun watch (Run keys, Startup, Tasks)"},
 };
-static RECT g_rNav[4], g_rTog[TOG_N], g_rScan, g_rMin, g_rClose, g_rSoc[3];
+static RECT g_rNav[4], g_rTog[TOG_N], g_rScan, g_rMin, g_rClose, g_rSoc[3], g_rUpdChk;      // g_rTog[TOG_N-1] is the Automatic updates switch on the Updates tab
 // Fullscreen fills the WORK AREA (screen minus taskbar), not the whole monitor -- distinct from the
 // AFK screen's own full-monitor takeover, which deliberately does cover the taskbar.
 static bool g_fullscreen=false; static RECT g_preFullRect={0,0,0,0};
@@ -260,8 +264,8 @@ static void renderScene(HDC dc,int W,int H){
       drawStrR(g,on?L"TOKEN GUARD \u25cf ON":L"TOKEN GUARD \u25cb OFF",fMono,sc,cx+W2-16,top+12);
       if(g_tokenAlerts.load()>0)
         drawStrR(g,(std::to_wstring(g_tokenAlerts.load())+L" token alert(s)").c_str(),fMono,C_RED,cx+W2-16,top+28); }
-    const REAL rowH=std::max<REAL>(34,std::min<REAL>(46,(H-top-72-78)/(TOG_N-1)));      // the rows must still fit the card at the smallest window (11 rows: 35 px each at 780x560)
-    for(int i=0;i<TOG_N;i++){ REAL y=top+44+i*rowH; bool on=g_toggles[i].v->load();
+    const REAL rowH=std::max<REAL>(34,std::min<REAL>(46,(H-top-72-78)/(TOG_PROT-1)));   // the rows must still fit the card at the smallest window (11 rows: 35 px each at 780x560)
+    for(int i=0;i<TOG_PROT;i++){ REAL y=top+44+i*rowH; bool on=g_toggles[i].v->load();
       drawStr(g,g_toggles[i].name,fBody,C_TX,cx+16,y);
       drawStr(g,g_toggles[i].desc,fMono,C_TXM,cx+16,y+18);
       REAL swx=cx+W2-80, swy=y+2;
@@ -270,7 +274,7 @@ static void renderScene(HDC dc,int W,int H){
       if(!on)strokeRound(g,swx,swy,46,26,13,C_LINE2);
       SolidBrush kn(on?Color(255,255,255,255):C_TXM);
       FEll(g,&kn, on?swx+22:swx+3, swy+3, 20,20);
-      if(i<TOG_N-1){ const REAL ly=y+std::min<REAL>(38,rowH-1); Pen ln(C_LINE,1); DLine(g,&ln,cx+16,ly,cx+W2-16,ly); }
+      if(i<TOG_PROT-1){ const REAL ly=y+std::min<REAL>(38,rowH-1); Pen ln(C_LINE,1); DLine(g,&ln,cx+16,ly,cx+W2-16,ly); }
     }
     // scan button
     g_rScan={(LONG)cx,(LONG)(H-58),(LONG)cx+150,(LONG)(H-24)};
@@ -303,7 +307,14 @@ static void renderScene(HDC dc,int W,int H){
   else { // UPDATES & CREDITS
     REAL logW=W2*0.60f, rx=cx+logW+16, rw=W2-logW-16;
     card(g,cx,top,logW,H-top-20); label(g,L"UPDATE LOG",cx+16,top+14);
-    REAL ly=top+44;
+    { // Automatic updates (core/update.cpp): what the last look found, "Check now", and the on/off switch
+      const bool on=g_toggles[TOG_N-1].v->load();
+      { RectF sc(cx+16,top+34,logW-32,20); g.SetClip(sc); drawStr(g,updateStatus().c_str(),fMono,C_TXD,cx+16,top+36); g.ResetClip(); }
+      g_rUpdChk={(LONG)(cx+16),(LONG)(top+58),(LONG)(cx+16+110),(LONG)(top+58+26)};
+      fillRound(g,cx+16,top+58,110,26,8,hov(g_rUpdChk)?C_VIOLET:C_VDIM); drawStr(g,L"Check now",fMono,Color(255,255,255,255),cx+31,top+63);
+      g_rTog[TOG_N-1]={(LONG)(cx+logW-16-132),(LONG)(top+58),(LONG)(cx+logW-16),(LONG)(top+58+26)};
+      drawStrR(g,on?L"AUTO-UPDATE ● ON":L"AUTO-UPDATE ○ OFF",fMono,on?C_GREEN:C_TXM,cx+logW-16,top+63); }
+    REAL ly=top+98;
     for(auto&nt:g_notes){ if(ly>H-38)break;
       Color kc=(wcscmp(nt.kind,L"FIX")==0)?C_GREEN:(wcscmp(nt.kind,L"IMPROVE")==0)?C_VIOLET:C_VDIM;
       strokeRound(g,cx+16,ly,66,18,4,kc); drawStr(g,nt.kind,fMono,kc,cx+21,ly+1);
@@ -422,7 +433,7 @@ LRESULT CALLBACK DashProc(HWND h,UINT m,WPARAM w,LPARAM l){
     if(inR(g_rScanTop,x,y)){ doScan(true); flash(g_rScanTop); return 0; }
     for(int i=0;i<4;i++) if(inR(g_rNav[i],x,y)){ g_tab=i; g_tabT0=GetTickCount64(); flash(g_rNav[i]); return 0; }
     if(g_tab==1){
-      for(int i=0;i<TOG_N;i++) if(inR(g_rTog[i],x,y)){ g_toggles[i].v->store(!g_toggles[i].v->load()); saveSettings(); autostartApply(); flash(g_rTog[i]); return 0; }
+      for(int i=0;i<TOG_PROT;i++) if(inR(g_rTog[i],x,y)){ g_toggles[i].v->store(!g_toggles[i].v->load()); saveSettings(); autostartApply(); flash(g_rTog[i]); return 0; }
       if(inR(g_rScan,x,y)){ doScan(true); flash(g_rScan); return 0; }
       if(inR(g_rFw,x,y)){ flash(g_rFw);
         // firewall.cpl's registered verb is "cplopen", not "open" -- asking for
@@ -437,7 +448,10 @@ LRESULT CALLBACK DashProc(HWND h,UINT m,WPARAM w,LPARAM l){
       std::wstring m=L"Block this app's internet access using Windows Firewall?\n\n"+g_evRowPath[i]+L"\n\n(You'll get a UAC prompt to apply the rule.)";
       if(MessageBoxW(h,m.c_str(),L"Sentinel \u2014 Firewall",MB_YESNO|MB_ICONWARNING)==IDYES) blockInFirewall(g_evRowPath[i]);
       return 0; } }
-    if(g_tab==3){ for(int i=0;i<3;i++) if(inR(g_rSoc[i],x,y)){ flash(g_rSoc[i]);
+    if(g_tab==3){
+      if(inR(g_rUpdChk,x,y)){ flash(g_rUpdChk); updateCheckNow(); return 0; }
+      if(inR(g_rTog[TOG_N-1],x,y)){ const bool now=!g_tUpdate.load(); g_tUpdate.store(now); saveSettings(); flash(g_rTog[TOG_N-1]); if(now) updateCheckNow(); return 0; }
+      for(int i=0;i<3;i++) if(inR(g_rSoc[i],x,y)){ flash(g_rSoc[i]);
         if(i==2){ if(OpenClipboard(h)){ EmptyClipboard();
             const wchar_t* d=L"liiusionator"; HGLOBAL hm=GlobalAlloc(GMEM_MOVEABLE,(wcslen(d)+1)*2);
             memcpy(GlobalLock(hm),d,(wcslen(d)+1)*2); GlobalUnlock(hm);

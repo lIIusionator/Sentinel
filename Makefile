@@ -50,7 +50,8 @@ LIBS     = -lgdiplus -lgdi32 -lole32 -loleaut32 -luuid -lmfplat -lmf -lmfreadwri
            -lshell32 -luser32 -ladvapi32 -lcrypt32 -lwintrust -lsecur32 -lwbemuuid
 
 SRC_SHARED = shared/sw_common.cpp shared/settings.cpp
-SRC_CORE   = core/autorun_watch.cpp core/eco.cpp core/events.cpp core/file_watch.cpp core/proc_watch.cpp core/response.cpp core/str_scan.cpp core/token_guard.cpp core/trust.cpp
+SRC_CORE   = core/autorun_watch.cpp core/eco.cpp core/events.cpp core/file_watch.cpp core/proc_watch.cpp core/response.cpp core/str_scan.cpp core/token_guard.cpp core/trust.cpp \
+             core/update.cpp
 SRC_UI     = ui/content.cpp ui/dashboard.cpp ui/gfx.cpp ui/main.cpp ui/toast.cpp
 SRC_AFK    = afk/afk_assets.cpp afk/afk_cpu_backend.cpp afk/afk_gpu_backend.cpp afk/afk_loop.cpp afk/afk_overlay_d2d.cpp \
              afk/afk_screen.cpp afk/afk_state.cpp afk/afk_tiers.cpp afk/afk_win.cpp
@@ -104,6 +105,8 @@ tests:
 	$(BUILD)/autostart_tests
 	g++ -std=c++17 -O1 -g -Wall -Wextra -Wno-misleading-indentation -Ishared tests/eco_tests.cpp -o $(BUILD)/eco_tests
 	$(BUILD)/eco_tests
+	g++ -std=c++17 -O1 -g -Wall -Wextra -Wno-misleading-indentation -Ishared tests/update_tests.cpp -o $(BUILD)/update_tests
+	$(BUILD)/update_tests
 
 # the Mac app's portable core (mac/core.cpp: settings, event feed, trust rules, watchers, strings scan, LaunchAgent, quotes, state JSON) against a fake operating system.
 # Plain C++17 + POSIX, so it runs on Linux; Windows (MinGW) has no flock / getpwuid, so it is left out of `tests` there.

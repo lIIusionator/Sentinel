@@ -15,5 +15,14 @@ void ecoRecover();                        // start: undo a power-saving plan tha
 void ecoTick();                           // about once a second: power saving after 30 min without input, back at the first input (core/eco.cpp)
 void ecoStop();                           // closing / sign-out / shutdown: put the user's power plan back
 
+// Automatic updates (core/update.cpp; the rules are shared/update.h). The worker thread does the network work; updateTick and the restart run on the UI thread.
+static const wchar_t* const UPD_RESTART_FLAG=L"--after-update";   // an update started this copy: the old one may still be exiting (ui/main.cpp waits for it)
+std::wstring ownExe();                    // full path of this exe
+void updateStart();                       // start: the worker that looks for a newer release (first look 90 s after start, then twice a day)
+void updateTidy();                        // start, once this copy owns the single-instance mutex: remove the leftovers of an update (<exe>.old, <exe>.new)
+void updateTick(bool busy);               // about once a second: installs a downloaded update when nothing is in the way (busy: AFK screen or dashboard showing)
+void updateCheckNow();                    // "Check now" button / Automatic updates switched on: look at once
+std::wstring updateStatus();              // one line for the Updates tab
+
 void blockInFirewall(const std::wstring& path);   // UAC-elevated netsh rule
 void stringsScanAsync(const std::wstring& path);  // queue a flagged program for the strings check: links / commands inside it (core/str_scan.cpp)

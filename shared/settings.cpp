@@ -7,7 +7,7 @@
 #include <cstdlib>
 
 std::atomic<bool> g_tAutorun{true},g_tProc{true},g_tFile{true},
-  g_tAllFiles{false},g_tNotify{true},g_tBeep{true},g_tIgnoreSys{true},g_tTokens{true},g_tStrings{true},g_tAutostart{true},g_tEco{true};
+  g_tAllFiles{false},g_tNotify{true},g_tBeep{true},g_tIgnoreSys{true},g_tTokens{true},g_tStrings{true},g_tAutostart{true},g_tEco{true},g_tUpdate{true};
 
 Toggle g_toggles[TOG_N]={
   {&g_tAutorun ,"autorun",  L"Autorun watch",                  L"Run keys, Startup folders, Tasks"},
@@ -21,6 +21,7 @@ Toggle g_toggles[TOG_N]={
   {&g_tIgnoreSys,"ignoresys",L"Ignore signed system processes",L"Silences sppsvc.exe-style noise"},
   {&g_tAutostart,"autostart",L"Start with Windows",            L"Starts hidden in the tray when you sign in"},
   {&g_tEco     ,"eco",      L"Power saving when away",         L"After 30 min idle: CPU max 25 %, screen dimmed"},   // the numbers: shared/eco.h
+  {&g_tUpdate  ,"update",   L"Automatic updates",              L"Checks GitHub twice a day, installs when idle"},    // not a Protection row: the Updates tab draws it (TOG_PROT)
 };
 int g_dashW=DASH_W, g_dashH=DASH_H, g_splashMs=3000;
 std::atomic<int> g_afkModePref{AFK_AUTO};

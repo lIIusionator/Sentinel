@@ -9,7 +9,7 @@
 
 std::set<std::wstring> g_known;
 
-static std::wstring ownExe(){ wchar_t p[MAX_PATH]; DWORD n=GetModuleFileNameW(nullptr,p,MAX_PATH); return (n&&n<MAX_PATH)?std::wstring(p,n):std::wstring(); }
+std::wstring ownExe(){ wchar_t p[MAX_PATH]; DWORD n=GetModuleFileNameW(nullptr,p,MAX_PATH); return (n&&n<MAX_PATH)?std::wstring(p,n):std::wstring(); }
 
 static void enumReg(HKEY r,const wchar_t* sub,const wchar_t* lab,std::set<std::wstring>& o){
   HKEY h; if(RegOpenKeyExW(r,sub,0,KEY_READ,&h)!=ERROR_SUCCESS)return;

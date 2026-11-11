@@ -3,9 +3,10 @@
 #include "sw_common.h"
 
 struct Toggle{ std::atomic<bool>* v; const char* key; const wchar_t* name; const wchar_t* desc; };
-static const int TOG_N=11;
+static const int TOG_N=12;       // every on/off switch that is saved ...
+static const int TOG_PROT=11;    // ... the first TOG_PROT are the rows of the Protection tab; the last one (Automatic updates) sits on the Updates tab
 extern Toggle g_toggles[TOG_N];
-extern std::atomic<bool> g_tAutorun,g_tProc,g_tFile,g_tAllFiles,g_tNotify,g_tBeep,g_tIgnoreSys,g_tTokens,g_tStrings,g_tAutostart,g_tEco;
+extern std::atomic<bool> g_tAutorun,g_tProc,g_tFile,g_tAllFiles,g_tNotify,g_tBeep,g_tIgnoreSys,g_tTokens,g_tStrings,g_tAutostart,g_tEco,g_tUpdate;
 
 static const int DASH_W=940, DASH_H=600;        // default / initial dashboard size
 static const int DASH_MINW=780, DASH_MINH=560;  // smallest the layout stays intact at

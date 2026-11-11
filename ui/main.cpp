@@ -67,6 +67,7 @@ static LRESULT CALLBACK MsgProc(HWND h,UINT m,WPARAM w,LPARAM l){
       updateQuoteState();                 // AFK detection + quote state machine; publishes to the AFK render thread
       afkScreenWatch();                   // supervisor: replaces an AFK thread that is stuck inside a GPU driver call
       ecoTick();                          // power saving after 30 min without input, undone at the first input (core/eco.cpp; looks at the clock itself: once a second)
+      updateTick(g_afkNow||afkScreenVisible()||(g_dash&&IsWindowVisible(g_dash)));   // a downloaded update installs when nothing is going on (core/update.cpp)
       cpuReport();                        // once a minute: a [CPU] line in events.log if the app used 3 % or more
       // The render thread owns smoothness while the AFK screen is up, so this only has to keep the
       // quote state machine ticking (50 ms is plenty); otherwise a cheap 1 s idle poll.
@@ -82,6 +83,7 @@ static LRESULT CALLBACK MsgProc(HWND h,UINT m,WPARAM w,LPARAM l){
 
 int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,PWSTR cmd,int){
   const bool background=cmd&&wcsstr(cmd,AUTOSTART_FLAG)!=nullptr;     // started by "Start with Windows": hidden in the tray, no dashboard
+  const bool restarted=cmd&&wcsstr(cmd,UPD_RESTART_FLAG)!=nullptr;    // started by an update (core/update.cpp): the old copy may still be shutting down
   g_hInst=hi; g_start=GetTickCount64(); srand((unsigned)g_start); cpuNameThread(L"ui");
   TR("before cacheDir();");
   cacheDir();                     // create %LOCALAPPDATA%\\SentinelWatch\\cache up front
@@ -98,6 +100,7 @@ int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,PWSTR cmd,int){
 
   TR("before HANDLE mtx=CreateMutexW");
   HANDLE mtx=CreateMutexW(0,TRUE,L"Sentinel_Single");
+  for(int i=0;i<80&&restarted&&GetLastError()==ERROR_ALREADY_EXISTS;i++){ if(mtx)CloseHandle(mtx); Sleep(250); mtx=CreateMutexW(0,TRUE,L"Sentinel_Single"); }   // shortcut: waits up to 20 s for the old copy to let go, then the normal rule below applies (a stuck old copy = this one quits; the next sign-in starts it)
   if(GetLastError()==ERROR_ALREADY_EXISTS){ if(mtx)CloseHandle(mtx);
     if(!background){ HWND other=FindWindowExW(HWND_MESSAGE,nullptr,CLS_MSG,nullptr); if(other) PostMessageW(other,WM_COMMAND,ID_OPEN,0); }   // started twice by hand: show the one that is running (it may be hidden in the tray)
     return 0; }
@@ -128,6 +131,7 @@ int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,PWSTR cmd,int){
 
   TR("before loadSettings(); saveSettings()");
   loadSettings(); saveSettings();   // persist toggle state as JSON in the app folder
+  updateTidy();                     // the leftovers of an update (<exe>.old, <exe>.new)
   autostartApply();                 // the Run value follows the "Start with Windows" toggle
   ecoRecover();                     // a power-saving plan left active by a run that did not end cleanly (crash, kill, shutdown) is undone first
   logLine(std::wstring(L"[AFK] Sentinel ")+SW_VERSION_W+L" build "+SW_BUILD_ID_W+L" starting"+(background?L" (hidden in the tray)":L""));
@@ -151,6 +155,7 @@ int WINAPI wWinMain(HINSTANCE hi,HINSTANCE,PWSTR cmd,int){
   SetTimer(g_msg,TMR_AUTOSCAN,300000,0);
   { HANDLE pt=CreateThread(0,0,ProcScanThread,0,0,0); if(pt){ SetThreadPriority(pt,THREAD_PRIORITY_BELOW_NORMAL); CloseHandle(pt);} }
 
+  updateStart();                    // the update worker: first look 90 s from now, then twice a day (it sleeps in between)
   TR("before afkScreenStart();");
   afkScreenStart();                 // AFK render thread: window, GPU/CPU back-ends, preload (all off the UI thread)
   TR("before openDash();");
