@@ -1,0 +1,12 @@
+* text=auto
+*.bat text eol=crlf
+*.sh  text eol=lf
+*.pl  text eol=lf
+Makefile text eol=lf
+*.mk  text eol=lf
+*.mp4 binary
+*.jpg binary
+*.png binary
+*.ico binary
+*.exe binary
+*.dmg binary

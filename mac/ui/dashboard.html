@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<title>Sentinel Watch</title>
+<!-- The Mac dashboard: shown by a WKWebView (mac/app.mm). The app pushes one JSON object into swState(); the page sends back {cmd:...} through
+     window.webkit.messageHandlers.sw. File names and paths come from disk and can be anything: they are only ever put in with textContent.
+     Safari 14 (macOS 11) is the floor: no flex gap, no inset, no aspect-ratio. Nothing here animates except the radar sweep (5 steps a second). -->
+<style>
+:root{--bg:#0a0e1a;--bg2:#0e1222;--panel:#141a2e;--line:#283052;--line2:#36426c;--blue:#78c4ff;--violet:#967cf6;--green:#5ce6a4;--red:#f8748c;--tx:#e7eaf4;--txd:#8c96b2;--txm:#5c6486;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;--sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--tx);font:13px/1.35 var(--sans);overflow:hidden;-webkit-user-select:none;user-select:none;cursor:default}
+body::after{content:"";position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;background:repeating-linear-gradient(to bottom,rgba(0,0,0,.10) 0,rgba(0,0,0,.10) 1px,transparent 1px,transparent 3px)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:default}
+#app{display:grid;grid-template-columns:200px 1fr;height:100%}
+/* sidebar */
+#side{background:var(--bg2);border-right:2px solid var(--line);display:flex;flex-direction:column;min-height:0;padding:16px 0 14px}
+.brand{display:flex;align-items:center;padding:0 18px;margin-bottom:22px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--blue);margin-right:9px;flex:none}
+.brand b{display:block;font-size:15px;letter-spacing:.08em}
+.brand small{display:block;font:10px var(--mono);color:var(--txm);letter-spacing:.14em}
+#nav button{display:block;position:relative;width:calc(100% - 24px);margin:0 12px 6px;height:40px;text-align:left;padding:0 18px;border-radius:9px;color:var(--txd);font-size:14px}
+#nav button:hover{background:rgba(150,124,246,.10);color:var(--tx)}
+#nav button.on{background:rgba(150,124,246,.19);color:var(--tx)}
+#nav button.on::before{content:"";position:absolute;left:0;top:6px;width:3px;height:28px;background:var(--blue)}
+.qbox{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 16px;margin-top:8px}
+#liveTag{font:11px var(--mono);color:var(--green);margin-bottom:6px;letter-spacing:.08em}
+#liveTag.afk{color:var(--violet)}
+#quote{flex:1;min-height:0;overflow:hidden;color:#c6cee2;line-height:1.38}
+#quote b{color:var(--tx)}
+.foot{padding:8px 18px 0;font:10px var(--mono);color:var(--txm)}
+.foot i{display:block;font-style:normal;color:#4b6a96;margin-bottom:3px}
+/* main */
+main{display:flex;flex-direction:column;min-width:0;min-height:0;padding:0 24px 16px}
+header{display:flex;align-items:center;height:58px;flex:none}
+h1{font:600 17px var(--mono);letter-spacing:.08em;width:150px;flex:none}
+.arrows{font:600 17px var(--mono);color:var(--violet);margin-right:14px}
+.btn{height:26px;padding:0 16px;border-radius:7px;background:var(--violet);font:12px var(--mono);color:#fff}
+.btn:hover{background:var(--blue)}
+.sp{flex:1}
+#clock{font:13px var(--mono);color:var(--txd);margin-right:14px}
+.chip{font:12px var(--mono);color:var(--blue);background:var(--panel);border-radius:6px;padding:4px 8px}
+#banner{flex:none;margin-bottom:10px;padding:8px 12px;border:1px solid var(--red);border-radius:9px;color:var(--red);font-size:12px;background:rgba(248,116,140,.08)}
+.tab{display:none;flex:1;min-height:0}
+.tab.on{display:flex;flex-direction:column}
+.card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-height:0;min-width:0}
+.card>label,.lbl{display:flex;align-items:center;font:11px var(--mono);letter-spacing:.14em;color:var(--txm)}
+.card>label::before,.lbl::before{content:"";width:14px;height:2px;background:var(--blue);margin-right:6px}
+.mon{position:absolute;right:16px;top:14px;font:11px var(--mono);color:var(--green);letter-spacing:.08em}
+.mon i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px}
+.big{display:block;font:600 28px var(--mono);margin-top:8px}
+.card small{display:block;font:11px var(--mono);color:var(--txm);margin-top:6px}
+/* dashboard tab */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);grid-column-gap:16px;flex:none}
+.cols{display:grid;grid-template-columns:62% 1fr;grid-column-gap:16px;margin-top:14px;flex:1;min-height:0}
+.evc{display:flex;flex-direction:column}
+.side2{display:grid;grid-template-rows:7fr 5fr;grid-row-gap:14px;min-height:0}
+.list{flex:1;min-height:0;overflow-y:auto;margin-top:12px}
+.list::-webkit-scrollbar{width:6px}.list::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+.ev{display:flex;align-items:center;padding:6px 8px;margin:0 -8px;border-radius:7px;min-height:40px}
+.ev.click:hover{background:rgba(248,116,140,.10)}
+.ev.click{cursor:pointer}
+.tag{flex:none;width:52px;text-align:center;font:11px var(--mono);border:1px solid var(--blue);color:var(--blue);border-radius:4px;padding:1px 0;margin-right:12px}
+.tag.WARN{border-color:var(--red);color:var(--red)}.tag.FILE{border-color:var(--green);color:var(--green)}.tag.SYS{border-color:var(--txm);color:var(--txm)}
+.ev .m{flex:1;min-width:0}
+.ev .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev .pa{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:11px var(--mono);color:var(--txm)}
+.ev .tm{flex:none;font:11px var(--mono);color:var(--txm);margin-left:10px}
+.empty{color:var(--txm);font:12px var(--mono);padding-top:6px}
+.radar{display:flex;flex-direction:column}
+.rd{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.rd div{position:relative;width:88px;height:88px;border:1px solid var(--line2);border-radius:50%;overflow:hidden}
+.rd div::before{content:"";position:absolute;left:18%;top:18%;width:64%;height:64%;border:1px solid var(--line2);border-radius:50%}
+.rd span{position:absolute;left:0;top:0;width:100%;height:100%;border-radius:50%;background:conic-gradient(rgba(150,124,246,0) 0deg,rgba(150,124,246,.55) 60deg,rgba(150,124,246,0) 61deg);animation:spin 6s steps(30) infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* protection tab */
+.prot{flex:1;display:flex;flex-direction:column}
+.phead{display:flex;justify-content:space-between;align-items:center;flex:none;height:18px}
+#tg{font:11px var(--mono);color:var(--txm)}#tg.on{color:var(--green)}
+#tAlerts{font:11px var(--mono);color:var(--red);margin-left:12px}
+#rows{flex:1;min-height:0;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column}
+.row{flex:1 1 34px;min-height:34px;max-height:46px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .n{font-size:13px}.row .d{font:11px var(--mono);color:var(--txm);margin-top:1px}
+.sw{flex:none;position:relative;width:46px;height:26px;border-radius:13px;background:#0c0d18;border:1px solid var(--line2);margin-left:14px}
+.sw::after{content:"";position:absolute;left:3px;top:2px;width:20px;height:20px;border-radius:50%;background:var(--txm)}
+.sw.on{background:var(--violet);border-color:var(--violet)}
+.sw.on::after{left:22px;background:#fff}
+.btns{flex:none;margin-top:12px}
+.btns .btn{height:34px;padding:0 28px;border-radius:9px;font:13px var(--sans)}
+/* updates tab */
+.upd{display:grid;grid-template-columns:56% 1fr;grid-column-gap:16px;flex:1;min-height:0}
+.log{display:flex;flex-direction:column}
+.note{display:flex;align-items:center;min-height:32px;padding:3px 0}
+.note .k{flex:none;width:62px;text-align:center;font:11px var(--mono);border:1px solid var(--violet);color:var(--violet);border-radius:4px;padding:1px 0;margin-right:10px}
+.note .k.FIX{border-color:var(--green);color:var(--green)}.note .k.IMPROVE{border-color:var(--blue);color:var(--blue)}
+.note .t{flex:1;min-width:0}
+.right{display:grid;grid-template-rows:auto 1fr;grid-row-gap:14px;min-height:0}
+.me{display:flex;align-items:center;margin:14px 0 8px}
+.me img{width:44px;height:44px;border-radius:50%;border:1px solid var(--line2);margin-right:12px;object-fit:cover}
+.me b{display:block;font-size:15px}.me small{display:block;font:11px var(--mono);color:var(--green);margin:0}
+.soc{display:block;width:100%;text-align:left;font:12px var(--mono);color:var(--txd);padding:4px 0}
+.soc::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:8px}
+.soc:hover{color:var(--tx)}
+.kv{display:flex;justify-content:space-between;font-size:13px;padding:5px 0}.kv span:first-child{font:11px var(--mono);color:var(--txm);padding-top:2px}
+.kv span:last-child{min-width:0;margin-left:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hint{flex:none;font:11px var(--mono);color:var(--txm);margin-top:10px}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="brand"><i class="dot"></i><div><b>SENTINEL</b><small>WATCH SUITE</small></div></div>
+    <nav id="nav"></nav>
+    <div class="qbox"><div id="liveTag">&#9679; LIVE</div><div id="quote"></div></div>
+    <div class="foot"><i id="glitch"></i>SENTINEL // ONLINE</div>
+  </aside>
+  <main>
+    <header><h1 id="title">DASHBOARD</h1><span class="arrows">&rsaquo;&rsaquo;&rsaquo;</span><button class="btn" id="scanTop">Quick scan</button><span class="sp"></span><span id="clock"></span><span class="chip" id="ver"></span></header>
+    <div id="banner" hidden></div>
+
+    <section class="tab on" id="t0">
+      <div class="stats">
+        <div class="card"><label>SESSION</label><b class="big" id="sSession">00:00:00</b><small>this run</small></div>
+        <div class="card"><label>PROCESSES SEEN</label><b class="big" id="sProcs">0</b><small>since launch</small></div>
+        <div class="card"><label>NEW FILES SEEN</label><b class="big" id="sFiles">0</b><small>watched folders</small></div>
+      </div>
+      <div class="cols">
+        <div class="card evc"><label>RECENT EVENTS</label><span class="mon"><i></i>MONITORING</span><div class="list" id="evShort"></div></div>
+        <div class="side2">
+          <div class="card radar"><label>WATCHERS</label><div class="rd"><div><span></span></div></div><b id="active" style="font-weight:400">0 / 4 active</b></div>
+          <div class="card"><label>LOGIN ITEMS</label><b class="big" id="sAuto">0</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="t1">
+      <div class="card prot">
+        <div class="phead"><span class="lbl">WATCHERS</span><span><span id="tg"></span><span id="tAlerts"></span></span></div>
+        <div id="rows"></div>
+      </div>
+      <div class="btns"><button class="btn" id="scanBtn">Quick scan</button></div>
+    </section>
+
+    <section class="tab" id="t2">
+      <div class="card evc" style="flex:1">
+        <label>EVENT STREAM</label><span class="mon"><i></i>LIVE</span><div class="list" id="evAll"></div>
+        <div class="hint">click a red WARN row to show it in Finder</div>
+      </div>
+    </section>
+
+    <section class="tab" id="t3">
+      <div class="upd">
+        <div class="card log"><label>UPDATE LOG &nbsp;v1.7</label><div class="list" id="notes"></div></div>
+        <div class="right">
+          <div class="card"><label>CREATOR</label>
+            <div class="me"><img src="avatar.jpg" alt="" onerror="this.style.display='none'"><div><b>Lunaris</b><small>OPERATOR</small></div></div>
+            <button class="soc" data-i="0">YouTube  @lIIusionator</button><button class="soc" data-i="1">Roblox  Profile</button><button class="soc" data-i="2">Discord  liiusionator</button></div>
+          <div class="card" style="overflow:hidden"><label>DEVICE INFO</label><div id="dev" style="margin-top:8px"></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const post=m=>{ try{ window.webkit.messageHandlers.sw.postMessage(m); }catch(e){} };
+const TABS=["Dashboard","Protection","Events","Updates"];
+const NOTES=[["FEATURE","macOS app for Apple Silicon: menu bar item, this dashboard, AFK screen"],["FEATURE","Start at login: hidden in the menu bar (Protection tab)"],
+  ["FEATURE","Process, file and login-item watch (FSEvents, LaunchAgents / Daemons)"],["FEATURE","Token Guard: warns when unsigned apps read your browser logins"],
+  ["FEATURE","Strings scan: links + commands inside flagged unsigned apps"],["FEATURE","AFK screen: looping video, clock and quote on every display"]];
+let S=null,tab=0,recvAt=0,quoteSeq=-1,rowsBuilt=false;
+
+function el(tag,cls,text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!==undefined) e.textContent=text; return e; }
+function clear(n){ n.textContent=""; }
+function pad(n){ return (n<10?"0":"")+n; }
+function hms(ms){ const s=Math.floor(ms/1000); return pad(Math.floor(s/3600))+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60); }
+
+// ---- tabs ----
+const nav=$("#nav");
+TABS.forEach((t,i)=>{ const b=el("button",i===0?"on":"",t); b.onclick=()=>setTab(i); nav.appendChild(b); });
+function scramble(node,text){ const G="01<>/\\#*+=x",t0=performance.now();
+  (function f(){ const k=(performance.now()-t0)/600; if(k>=1){ node.textContent=text; return; }
+    node.textContent=Array.from(text).map((c,i)=>(c===" "||i<k*text.length)?c:G[Math.floor(Math.random()*G.length)]).join(""); requestAnimationFrame(f); })(); }
+function setTab(i){ tab=i;
+  Array.from(nav.children).forEach((b,j)=>b.classList.toggle("on",j===i));
+  for(let j=0;j<4;j++) $("#t"+j).classList.toggle("on",j===i);
+  scramble($("#title"),TABS[i].toUpperCase()); }
+$("#scanTop").onclick=$("#scanBtn").onclick=()=>post({cmd:"scan"});
+document.querySelectorAll(".soc").forEach(b=>{ b.onclick=()=>{ post({cmd:"social",i:+b.dataset.i});
+  if(b.dataset.i==="2"){ const t=b.textContent; b.textContent="Discord  copied to the clipboard"; setTimeout(()=>{ b.textContent=t; },1500); } }; });
+
+// ---- the quote: **bold**, and the biggest type that fits the box ----
+function setQuote(q){ const box=$("#quote"); clear(box);
+  q.split("**").forEach((p,i)=>{ if(p) box.appendChild(i%2?el("b",null,p):document.createTextNode(p)); });
+  for(let px=15;px>=10;px--){ box.style.fontSize=px+"px"; if(box.scrollHeight<=box.clientHeight) break; } }
+
+// ---- lists ----
+function evRow(e,clickable){ const r=el("div","ev"); r.appendChild(el("span","tag "+e.tag,e.tag));
+  const m=el("div","m"); m.appendChild(el("div","nm",e.name)); { const pa=el("div","pa",e.path); pa.title=e.path; m.appendChild(pa); } r.appendChild(m); r.appendChild(el("span","tm",e.tm));
+  if(clickable&&e.tag==="WARN"&&e.path.charAt(0)==="/"){ r.classList.add("click"); r.title="Show in Finder"; r.onclick=()=>post({cmd:"reveal",path:e.path}); }
+  return r; }
+function fillEvents(node,list,n,clickable){ clear(node); if(!list.length){ node.appendChild(el("div","empty","nothing yet")); return; }
+  list.slice(0,n).forEach(e=>node.appendChild(evRow(e,clickable))); }
+function buildRows(toggles){ const rows=$("#rows"); clear(rows);
+  toggles.forEach(t=>{ const r=el("div","row"),txt=el("div"); txt.appendChild(el("div","n",t.name)); txt.appendChild(el("div","d",t.desc)); r.appendChild(txt);
+    const sw=el("button","sw"); sw.dataset.key=t.key; sw.setAttribute("role","switch"); sw.setAttribute("aria-label",t.name); sw.onclick=()=>post({cmd:"toggle",key:t.key}); r.appendChild(sw); rows.appendChild(r); });
+  rowsBuilt=true; }
+
+// ---- the state the app pushes ----
+window.swState=function(s){ S=s; recvAt=performance.now();
+  $("#ver").textContent=s.version;
+  const lt=$("#liveTag"); lt.textContent=s.afk?"● AFK":"● LIVE"; lt.className=s.afk?"afk":"";
+  if(s.quoteSeq!==quoteSeq){ quoteSeq=s.quoteSeq; setQuote(s.quote); }
+  $("#sProcs").textContent=s.procs; $("#sFiles").textContent=s.files; $("#sAuto").textContent=s.autoruns;
+  const b=$("#banner"); b.hidden=s.signOk!==false;
+  if(!b.hidden) b.textContent="Signature checks do not work on this Mac, so warnings about unsigned programs are switched off. The reason is in events.log (Library/Application Support/SentinelWatch).";
+  if(!rowsBuilt||document.querySelectorAll(".sw").length!==s.toggles.length) buildRows(s.toggles);
+  const on={}; s.toggles.forEach(t=>{ on[t.key]=t.on; });
+  document.querySelectorAll(".sw").forEach(n=>{ const v=!!on[n.dataset.key]; n.classList.toggle("on",v); n.setAttribute("aria-checked",v); });
+  const act=["autorun","proc","file","tokens"].filter(k=>on[k]).length; $("#active").textContent=act+" / 4 active";
+  const tg=$("#tg"); tg.textContent=s.tokenGuard?"TOKEN GUARD ● ON":"TOKEN GUARD ○ OFF"; tg.className=s.tokenGuard?"on":"";
+  $("#tAlerts").textContent=s.tokenAlerts>0?s.tokenAlerts+" token alert(s)":"";
+  fillEvents($("#evShort"),s.events,9,false); fillEvents($("#evAll"),s.events,80,true);
+  const d=s.device,dev=$("#dev"); clear(dev);
+  [["HOST",d.host],["USER",s.user],["CPU",d.cpu],["MEMORY",d.mem],["DISPLAY",d.display],["UPTIME",Math.floor(d.uptimeMin/60)+"h "+d.uptimeMin%60+"m"]].forEach(r=>{
+    const row=el("div","kv"); row.appendChild(el("span",null,r[0])); row.appendChild(el("span",null,r[1])); dev.appendChild(row); });
+  tick(); };
+
+// ---- the log on the Updates tab ----
+(function(){ const n=$("#notes"); NOTES.forEach(x=>{ const r=el("div","note"); r.appendChild(el("span","k "+x[0],x[0])); r.appendChild(el("span","t",x[1])); n.appendChild(r); }); })();
+
+// ---- once a second: the clock and the session time (cheap; the browser pauses this while the window is hidden) ----
+function tick(){ const d=new Date(); $("#clock").textContent=pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+  if(S) $("#sSession").textContent=hms(S.sessionMs+(performance.now()-recvAt));
+  let g=""; const G="01<>/\\#*+=x"; for(let i=0;i<12;i++) g+=G[Math.floor(Math.random()*G.length)]; $("#glitch").textContent=g; }
+window.addEventListener("resize",()=>{ if(S) setQuote(S.quote); });
+setInterval(tick,1000); tick();
+post({cmd:"ready"});
+</script>
+</body>
+</html>

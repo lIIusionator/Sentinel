@@ -1,0 +1,12 @@
+/* sentinel.rc -- binary resources compiled into the exe (names are in resource_ids.h).
+ *
+ *   AVATAR_JPG   160x160 creator avatar for the dashboard
+ *   AFK_4K60     H.264 3840x2160 @ 60 fps + AAC   -- the AFK screen's 4K background, played by the GPU video engine
+ *   AFK_LITE     H.264 1920x1080 @ 30 fps + AAC   -- the lighter rendition: second tier of the GPU player and the CPU renderer's clip
+ *
+ * The clips are H.264 on purpose: it plays on every Windows 10/11 install, whereas HEVC (H.265) needs the separate
+ * "HEVC Video Extensions" package, which a stripped-down Windows (AtlasOS and the like) usually does not have.
+ * The paths are relative to this file; build with -I res or from inside res/. */
+AVATAR_JPG  RCDATA "avatar.jpg"
+AFK_4K60    RCDATA "afk_bg_4k60.mp4"
+AFK_LITE    RCDATA "afk_bg_lite.mp4"

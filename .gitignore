@@ -1,0 +1,17 @@
+# build output
+/build/
+/build-*/
+/dist/
+/sentinel.exe
+/sentinel_test*.exe
+*.o
+*.res.o
+*.dSYM/
+
+# editors, OS, python
+.DS_Store
+.vscode/
+.idea/
+*.swp
+__pycache__/
+*.pyc
