@@ -104,7 +104,7 @@ Expect **0 warnings** with `-Wall -Wextra` (the Makefile switches off `-Wmislead
     `core/update.cpp` is the Windows side: WinHTTP loaded at run time (rule 3), one below-normal worker thread asleep on an event (rules 2 and 10: `CreateThread`, no `std::thread`, nothing periodic that costs CPU).
     Trust = HTTPS + the GitHub account (the exes are not code-signed), so `updParseRelease` stays strict: not a draft / pre-release, a plain version tag newer than `SW_VERSION`, asset addresses only under
     `https://github.com/<UPD_REPO>/releases/download/`, the exe's SHA-256 equal to its line in `SHA256SUMS.txt`. The swap runs on the UI thread (`updateTick`, the 1 s timer) only with no AFK screen, the dashboard hidden and
-    input idle >= 60 s; every failing step puts the old exe back. **Release procedure:** the tag `vX.Y.Z` must equal `SW_VERSION` (the workflow checks it, or an installed copy would download the release again and again);
+    input idle >= 60 s; every failing step puts the old exe back. **Release procedure:** change `SW_VERSION`, push to main: the workflow publishes `<SW_VERSION>` when it has no release yet (it creates the tag itself; a tag pushed by hand must equal `SW_VERSION`, the workflow checks it, or an installed copy would download the release again and again);
     assets `SentinelWatch.exe`, `SentinelWatch-Setup.exe`, `SHA256SUMS.txt`; the repository must be public (a private one answers 404). Test hooks (sentinel_test.exe only; plain http only there): `SW_TEST_UPDATE_URL`,
     `SW_TEST_UPDATE_FIRST` (ms), `SW_TEST_UPDATE_IDLE` (s). Never run: real HTTPS / TLS to api.github.com and github.com, the swap with a real antivirus holding the file, a failing swap (the rollback code has no test), a real release.
 

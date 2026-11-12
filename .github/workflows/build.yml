@@ -1,6 +1,6 @@
-# build.yml -- every push runs the tests and builds the Windows exe and setup. Pushing a version tag (v1.0, v1.0.1, ...) also publishes the release
-# that installed copies update themselves from (README section 13): the tag must be the version in shared/version.h, the "windows" job checks that.
-#   release:  edit SW_VERSION in shared/version.h, commit, push, then   git tag v1.0.1 && git push origin v1.0.1
+# build.yml -- every push runs the tests and builds the Windows exe and setup. A push to main whose version (SW_VERSION in shared/version.h) has no release yet
+# also publishes that release, with the files that installed copies update themselves from (README section 13). Pushing a tag (v1.0.1) by hand does the same.
+#   release:  change SW_VERSION in shared/version.h, commit, push to main. Nothing else.
 name: build
 
 on:
@@ -16,6 +16,9 @@ permissions:
 defaults:
   run:
     shell: bash
+
+concurrency:
+  group: build-${{ github.ref }}      # two pushes in a row must not both try to publish the same release
 
 jobs:
   tests:
@@ -33,13 +36,18 @@ jobs:
   windows:
     needs: tests
     runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - name: Version (a tag must be the program's own version)
+        id: version
         run: |
           ver=$(sed -n 's/^#define SW_VERSION  *"\([^"]*\)".*/\1/p' shared/version.h | head -n1)
           [ -n "$ver" ] || { echo "::error::no SW_VERSION in shared/version.h"; exit 1; }
           echo "VER=${ver#v}" >> "$GITHUB_ENV"
+          echo "tag=$ver" >> "$GITHUB_OUTPUT"
           if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$ver" ]; then
             echo "::error::the tag $GITHUB_REF_NAME is not the program's version $ver (shared/version.h): an installed copy would download it again and again"
             exit 1
@@ -60,17 +68,22 @@ jobs:
         with:
           name: dist-windows
           path: dist/*
-      - name: Publish the release (tags only)
-        if: github.ref_type == 'tag'
+      - name: Publish the release (when this version has none yet)
+        id: publish
+        if: github.event_name != 'pull_request' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main')
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
+          # shortcut: a release that exists is never touched by a push to main (installed copies already trust its files); only a tag pushed by hand may add files to it
           notes="Windows: run SentinelWatch-Setup.exe (no administrator rights needed), or use SentinelWatch.exe on its own. The files are not code-signed, so Windows SmartScreen asks once: More info, then Run anyway. A copy that is already installed updates itself from releases like this one. SHA256SUMS.txt has the SHA-256 of each file."
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            if [ "$GITHUB_REF_TYPE" = tag ]; then gh release upload "$TAG" dist/* --clobber; echo "published=true" >> "$GITHUB_OUTPUT"
+            else echo "release $TAG exists already: nothing to publish"; echo "published=false" >> "$GITHUB_OUTPUT"; fi
           else
-            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --title "Sentinel Watch $GITHUB_REF_NAME" --notes "$notes" --generate-notes
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Sentinel Watch $TAG" --notes "$notes" --generate-notes
+            echo "published=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/upload-artifact@v4
         if: always()
@@ -79,7 +92,7 @@ jobs:
           path: windows.log
 
   mac:
-    needs: windows               # on a tag the release exists by now: the Mac build can never hold it back
+    needs: windows               # the release exists by now: the Mac build can never hold it back
     runs-on: macos-latest
     continue-on-error: true      # shortcut: the Mac app has never been run (only compiled), so a failed Mac build must not fail the run; remove when somebody has tried it on a Mac
     steps:
@@ -94,12 +107,13 @@ jobs:
         with:
           name: dist-macos
           path: SentinelWatch-macOS.dmg
-      - name: Add the disk image to the release (tags only)
-        if: github.ref_type == 'tag'
+      - name: Add the disk image to the release (when this run published it)
+        if: needs.windows.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release upload "$GITHUB_REF_NAME" SentinelWatch-macOS.dmg --clobber
+          TAG: ${{ needs.windows.outputs.tag }}
+        run: gh release upload "$TAG" SentinelWatch-macOS.dmg --clobber
       - uses: actions/upload-artifact@v4
         if: always()
         with:

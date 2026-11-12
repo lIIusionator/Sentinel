@@ -529,10 +529,11 @@ may be reported once as a new unsigned program after an update.
 **Log.** `[UPD]` lines: `up to date`, `<tag> is available ...: downloading`, `<tag> downloaded, SHA-256 matches`, `installed <tag> ...: restarting`, `check failed: <why>`, `cannot install <tag>: <why>`.
 
 **Publishing a release** (whoever maintains the repository)
-1. Change `SW_VERSION` in `shared/version.h` (`"v1.0.1"`), and `SW_BUILD_ID` if the AFK behaviour changed (rule 6 in `CLAUDE.md`). Commit and push to `main`.
-2. Wait until the push is green (Actions tab), then tag it: `git tag v1.0.1 && git push origin v1.0.1`. The workflow (`.github/workflows/build.yml`) checks that the tag is `SW_VERSION`, runs the tests, builds
-   `SentinelWatch.exe` and `SentinelWatch-Setup.exe`, writes `SHA256SUMS.txt` (of both) and publishes the release with the three files; the Mac job adds `SentinelWatch-macOS.dmg` if it works.
-3. Installed copies find it within 12 hours and install it when their PC is idle. A draft or pre-release is ignored by them: use that to try the workflow without updating anybody.
+1. Change `SW_VERSION` in `shared/version.h` (`"v1.0.1"`), and `SW_BUILD_ID` if the AFK behaviour changed (rule 6 in `CLAUDE.md`). Commit and push to `main`. That is all.
+2. The workflow (`.github/workflows/build.yml`) runs the tests and builds `SentinelWatch.exe` and `SentinelWatch-Setup.exe`. If the tests pass and **that version has no release yet**, it writes `SHA256SUMS.txt` (of both),
+   creates the tag and publishes the release with the three files; the Mac job adds `SentinelWatch-macOS.dmg` if it works. A push that does not change the version never touches an existing release.
+   (Pushing a tag by hand, `git tag v1.0.1 && git push origin v1.0.1`, works too: the workflow then checks that the tag is `SW_VERSION`.)
+3. Installed copies find it within 12 hours and install it when their PC is idle. A draft or pre-release that you make by hand is ignored by them (the workflow itself always publishes a normal release).
 4. Without GitHub Actions: build (`./build.sh`, then `makensis -DEXE=<SentinelWatch.exe> -DVERSION=1.0.1 -DOUT=SentinelWatch-Setup.exe installer/windows/sentinel.nsi`), run
    `sha256sum SentinelWatch.exe SentinelWatch-Setup.exe > SHA256SUMS.txt`, create the release by hand (Releases -> Draft a new release, tag `v1.0.1`) and drag the three files in. Publish last: the files must all be there.
 
