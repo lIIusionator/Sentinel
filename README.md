@@ -321,10 +321,12 @@ Verified:
   lower tier `there is no lower tier` and `NO MOVING VIDEO was shown`. **Not proven:** that this cures the "video sometimes missing" report on your laptop. That cause was never reproduced: what was
   found is a flaw in the logs of the repeat runs (the player was replaced only when the screen was already due, so every later screen started on a player that was still loading); the video check and the
   log lines are the net under anything else
-* **107 checks** for the updater's rules (`shared/update.h`: version compare, SHA-256 against the standard test vectors, the JSON reader, which releases are accepted and which refused, the checksum file,
+* **115 checks** for the updater's rules (`shared/update.h`: version compare, SHA-256 against the standard test vectors, the JSON reader, which releases are accepted and which refused, the checksum file,
   the "installed before" guard, https-only addresses; also under ASan + UBSan). Under Wine, `tests/update_e2e.sh` runs the real exe against a fake release server on the same PC: a newer release is
   downloaded, checked, swapped in and the new copy starts (exactly one restart, `.old` removed, `update_applied.txt` written); a wrong checksum, a cut-off download, the same version, a pre-release, a missing
   release (404) and the switch off each leave the exe untouched; with the dashboard open the update is downloaded but not installed
+* **the real v1.0 release** (published by the workflow on Nov 12): the files were downloaded and their SHA-256 equal `SHA256SUMS.txt`; the updater's parser accepts GitHub's real JSON for it and picks the right two addresses
+  (kept as a test: `tests/fixtures/`); the released exe starts under Wine; the released `SentinelWatch-Setup.exe` installs the identical exe and uninstalls under Wine
 * the Windows setup, run silently under Wine (`tests/installer_test.sh`, built around a stand-in exe): it closes a running copy, replaces the program file, removes the leftovers of an update, writes the start menu
   link and the uninstall entry; the uninstaller removes all of it plus the "start with Windows" value and keeps the data folder (a silent uninstall never asks)
 * the static import list is the original one plus GDI32 and WINMM (the updater adds none: WinHTTP is loaded at run time)
@@ -537,7 +539,7 @@ may be reported once as a new unsigned program after an update.
 4. Without GitHub Actions: build (`./build.sh`, then `makensis -DEXE=<SentinelWatch.exe> -DVERSION=1.0.1 -DOUT=SentinelWatch-Setup.exe installer/windows/sentinel.nsi`), run
    `sha256sum SentinelWatch.exe SentinelWatch-Setup.exe > SHA256SUMS.txt`, create the release by hand (Releases -> Draft a new release, tag `v1.0.1`) and drag the three files in. Publish last: the files must all be there.
 
-**Tests.** `make tests` runs `tests/update_tests.cpp` (107 checks). The end-to-end run under Wine needs two test exes that differ only in their version:
+**Tests.** `make tests` runs `tests/update_tests.cpp` (115 checks). The end-to-end run under Wine needs two test exes that differ only in their version:
 ```sh
 make CROSS=x86_64-w64-mingw32- TEST=1                                   # sentinel_test.exe, says v1.0
 CXXFLAGS='-O2 -DSW_VERSION_OVERRIDE=\"v1.0.1\"' make CROSS=x86_64-w64-mingw32- TEST=1 BUILD=build-test-b OUT=sentinel_test_b.exe

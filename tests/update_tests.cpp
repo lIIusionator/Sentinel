@@ -117,8 +117,23 @@ static void testUrl(){
   CHECK(!updParseUrl("https://git hub.com/x",false,u)&&!updParseUrl("https://github.com:80:90/x",false,u));
 }
 
+// The parser against what GitHub really answered for the v1.0 release of this repository (tests/fixtures: the API's JSON and the SHA256SUMS.txt that came with it).
+static std::string readFile(const char* p){ FILE* f=fopen(p,"rb"); std::string s; if(!f) return s; char b[4096]; size_t n; while((n=fread(b,1,sizeof b,f))>0) s.append(b,n); fclose(f); return s; }
+static void testReal(){
+  const std::string body=readFile("tests/fixtures/github_release_v1.0.json"), sums=readFile("tests/fixtures/github_SHA256SUMS_v1.0.txt");
+  CHECK(!body.empty()&&!sums.empty());                       // run from the repository root, as `make tests` does
+  UpdateRelease r; std::string err, hex;
+  CHECK(updParseRelease(body,"lIIusionator/Sentinel",r,err));
+  CHECK(r.tag=="v1.0");
+  CHECK(r.exeUrl=="https://github.com/lIIusionator/Sentinel/releases/download/v1.0/SentinelWatch.exe");
+  CHECK(r.sumsUrl=="https://github.com/lIIusionator/Sentinel/releases/download/v1.0/SHA256SUMS.txt");
+  CHECK(updSumFor(sums,"SentinelWatch.exe",hex)&&hex=="743d26fe66c01a27355395fe43a7d25afffdc2c997d84237d79afd20db390e64");
+  CHECK(!verNewer("v1.0",r.tag)&&verNewer("v0.9",r.tag));    // v1.0 is up to date, anything older updates
+  UpdateRelease o; CHECK(!updParseRelease(body,"someone/else",o,err));   // the same answer for another repository is refused: its addresses are not that repository's
+}
+
 int main(){
-  testVersions(); testSha(); testJson(); testRelease(); testSums(); testUrl();
+  testVersions(); testSha(); testJson(); testRelease(); testSums(); testUrl(); testReal();
   printf("\n%d checks, %d failed\n",g_checks,g_fail);
   return g_fail?2:0;
 }
