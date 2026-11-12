@@ -1,0 +1,61 @@
+[OS] Linux
+g++ -std=c++17 -O1 -g -Wall -Wextra -Wno-misleading-indentation -Icore -Imac -Ishared tests/mac_logic_tests.cpp mac/core.cpp -pthread -o build/mac_logic_tests
+build/mac_logic_tests
+  (skipped: this host's temp folder is itself a staging folder; run with TMPDIR=<dir>/Users/Shared/x to include the check)
+mac logic: 304 checks, 0 failed
+g++ -std=c++17 -O1 -g -Wall -Wno-misleading-indentation -Iafk -Imedia-engine/src tests/afk_tests.cpp -o build/afk_tests -pthread
+build/afk_tests
+[video check (AfkVideoGate)]
+[reveal hold]
+[preload lead]
+[afkCopyOpaque32]
+[afkHasContent]
+[AfkPacer]
+[afkPickBest]
+[afkCpuTickMs]
+[vignette]
+[afkBlendT]
+[afkFrameLayoutOk]
+[afkGridNext]
+[AfkFrameExchange]
+[stage / fade / quote alpha]
+[stars]
+[cover / layout / sync]
+[text helpers]
+[tier ladder]
+[watchdog]
+[afkMul255]
+[afkMulGainOpaque32]
+[afkBlendGainOpaque32]
+[afkFill32 / gain map]
+[AfkTierMemory]
+[tier memory over sessions]
+[afkGpu setting]
+[me_util]
+
+62579 checks, 0 failed
+g++ -std=c++17 -O1 -g -Wall -Wno-misleading-indentation -Icore tests/str_scan_tests.cpp -o build/str_scan_tests
+build/str_scan_tests
+[links]
+[hot links]
+[ip:port]
+[commands]
+[runs, limits]
+[macOS]
+[Mach-O / script sniffing]
+
+113 checks, 0 failed
+bash tests/mac_cli_test.sh build
+mac cli: 21 checks, 0 failed
+g++ -std=c++17 -O1 -g -Wall -Wextra -Ishared tests/autostart_tests.cpp -o build/autostart_tests
+build/autostart_tests
+
+13 checks, 0 failed
+g++ -std=c++17 -O1 -g -Wall -Wextra -Wno-misleading-indentation -Ishared tests/eco_tests.cpp -o build/eco_tests
+build/eco_tests
+
+43 checks, 0 failed
+g++ -std=c++17 -O1 -g -Wall -Wextra -Wno-misleading-indentation -Ishared tests/update_tests.cpp -o build/update_tests
+build/update_tests
+
+115 checks, 0 failed
