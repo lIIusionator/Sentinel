@@ -1,144 +1,129 @@
 # Sentinel Watch Suite
 
-## Authors
+A cross-platform system-monitoring suite for Windows and macOS, written primarily in C++17 with native platform components. Sentinel monitors processes, startup items and files, and provides an event dashboard and AFK screensaver. Windows also includes an optional strings scan for links and suspicious commands in flagged programs.
 
-<div align="left">
-  <a href="https://github.com/lIIusionator"><img src="https://github.com/lIIusionator.png?size=40" width="40" height="40" alt="lIIusionator" /></a>
-  <a href="https://github.com/JustZeal"><img src="https://github.com/JustZeal.png?size=40" width="40" height="40" alt="JustZeal" /></a>
-</div>
+> **Project status:** Windows and macOS builds are not code-signed. The macOS app compiles in CI but has not yet been run on a Mac. Windows GPU playback and power-management behavior also need validation on real hardware. See [Known limitations](#known-limitations).
 
-- [lIIusionator](https://github.com/lIIusionator) — Author
-- [JustZeal](https://github.com/JustZeal) — Co-author
+## Project contributors
 
-A small system-monitoring suite for Windows and macOS. Sentinel watches processes, files and startup items, and includes an AFK screensaver. Windows also has an optional strings scan for links and suspicious commands inside flagged programs; it is on by default.
+| Contributor | Role |
+|---|---|
+| <img src="https://github.com/lIIusionator.png?size=32" width="32" height="32" alt="" /> [lIIusionator](https://github.com/lIIusionator) | Author and maintainer |
+| <img src="https://github.com/JustZeal.png?size=32" width="32" height="32" alt="" /> [JustZeal](https://github.com/JustZeal) | Co-author |
 
-Windows ships as one executable with both video clips embedded. The macOS version is a separate app. Sentinel is MIT-licensed; the bundled video clips and avatar image have separate terms (`THIRD_PARTY.md`).
+## Overview
 
-> **Please read:** Windows and Mac builds are not code-signed. The macOS app has compiled in CI but has not yet been run on a Mac. See [Known limitations](#known-limitations).
+- Process, startup-item and file monitoring with an event dashboard.
+- Program trust checks and a configurable strings scan. The strings scan is enabled by default on supported builds; results are indicators, not proof of malicious activity.
+- Windows tray application with optional startup launch, automatic updates and power saving while idle.
+- AFK screensaver with looping video, audio, clock and quote. The Windows executable embeds two video clips.
+- Separate macOS app with a menu-bar interface and platform-native monitoring components.
 
-## Install
+### Platform support
 
-Get release downloads from [Latest release](https://github.com/lIIusionator/Sentinel/releases/latest). Choose the steps for your operating system:
+| Platform | Availability |
+|---|---|
+| Windows 10/11, x64 | Main application; release installer and standalone executable available. |
+| macOS, Apple Silicon and Intel | App build supported; runtime behavior has not yet been verified on a Mac. |
+| Linux | No native app. Linux can cross-compile the Windows executable; use it on Windows. |
 
-### Windows 10/11
+## Get a release
 
-1. Download **`SentinelWatch-Setup.exe`** from the release assets and run it. It installs just for your Windows account under `%LOCALAPPDATA%\Programs\SentinelWatch`; administrator rights are not required.
-2. If SmartScreen warns that the app is unrecognized, choose **More info → Run anyway**. This warning appears because the app is not code-signed.
-3. Launch **Sentinel Watch** from the Start menu. It starts hidden in the system tray by default; double-click its tray icon to open the dashboard.
+Download assets from [Latest release](https://github.com/lIIusionator/Sentinel/releases/latest).
 
-Prefer not to install? Download **`SentinelWatch.exe`**, put it in a folder you can write to, and run it. The installer and standalone executable are both listed in `SHA256SUMS.txt`; verify either with:
+- **Windows:** Run `SentinelWatch-Setup.exe` for a per-user installation, or download `SentinelWatch.exe` and run it from a writable folder. The app is unsigned, so SmartScreen may show a warning. The app starts in the tray by default; double-click its icon to open the dashboard.
+- **macOS:** If the release includes `SentinelWatch-macOS.dmg`, open it and copy `SentinelWatch.app` to Applications. The app is ad-hoc signed, not notarized, and has not been run on a Mac; use with care.
+- **Linux:** There is no Linux release. See [Build on Linux](#linux-windows-cross-build) to cross-compile the Windows executable.
 
-```powershell
-Get-FileHash .\SentinelWatch.exe -Algorithm SHA256
+Release assets include `SHA256SUMS.txt`. On Windows, check a downloaded executable with `Get-FileHash .\SentinelWatch.exe -Algorithm SHA256` and compare the result with its entry in that file.
+
+## Development setup
+
+### Repository checkout
+
+The bundled clips are large assets required by the Windows build. Clone the full repository before building:
+
+```sh
+git clone https://github.com/lIIusionator/Sentinel.git
+cd Sentinel
 ```
 
-Compare the result with the matching entry in `SHA256SUMS.txt`.
+### Windows build
 
-### macOS (Apple Silicon and Intel)
-
-1. Download **`SentinelWatch-macOS.dmg`** from a release that includes it, open the disk image, and drag **SentinelWatch.app** to **Applications**.
-2. If macOS blocks the downloaded app, Control-click it in Applications, choose **Open**, and confirm. This build is ad-hoc signed, not notarized; macOS may require an extra approval.
-3. Open Sentinel Watch. It appears in the menu bar. On first access to Downloads, macOS asks whether it may monitor that folder; allow access if you want that folder watched.
-
-The Mac app is an early, **not yet run on real macOS** build. Expect runtime issues and review [Known limitations](#known-limitations) before relying on it.
-
-### Linux
-
-**There is no native Linux Sentinel app.** Linux can be used to cross-compile the Windows executable, but that does not make it a Linux application.
-
-To build the Windows version from Linux:
-
-1. Install a MinGW-w64 cross-compiler (`x86_64-w64-mingw32-g++`) and the usual build tools (`make`, `bash`).
-2. Clone this repository, including its large video assets, and enter the directory:
-   ```sh
-   git clone https://github.com/lIIusionator/Sentinel.git
-   cd Sentinel
-   ```
-3. Build:
-   ```sh
-   ./build.sh
-   ```
-   The output is `sentinel.exe`. Transfer it to a Windows PC to use it. The AFK clips are embedded in the executable.
-
-Running the Windows build under Wine is useful for some tests, but is not a supported Linux installation. For the native macOS app, build on macOS instead; see [Build from source](#build-from-source).
-
-## What it does
-
-- **Watches** processes, startup entries and selected files for suspicious changes.
-- **Checks trust** of programs and can inspect strings in flagged files for links and suspicious commands. The strings scan is enabled by default and can be turned off in Protection settings.
-- **Shows alerts and an event log** in the dashboard.
-- **Can start with Windows** in the tray and check for Windows updates from this repository's releases.
-- **Offers an AFK screensaver** with looping video, sound, a clock and a quote.
-- **On Windows, can save power while you're away:** after 30 minutes without input it temporarily limits CPU performance and dims the screen, then restores your power plan when you return. This behavior is enabled by default and can be switched off.
-
-## The AFK screen: an extremely serious feature list
-
-- Plays a giant, cinematic video while you are away, because apparently the desktop needed a screensaver with a budget.
-- Includes a smaller video for computers that would rather not render the director's cut.
-- Adds a clock, a quote, a starfield and a dramatic lens vignette. Your monitor is now a tiny planetarium with opinions.
-- Notices when you come back and gets out of your way. It has learned basic manners.
-- On Windows, tries the GPU first and steps down to lighter playback if the machine struggles. No promise that your GPU won't make its own artistic choices.
-- Comes with two clips already inside the Windows executable. You can also drop a supported video into `%LOCALAPPDATA%\SentinelWatch\content\afk`.
-
-The Windows AFK wait can be configured in `%LOCALAPPDATA%\SentinelWatch\settings.json` with `afkIdleSec` (`0` uses the Windows screen-saver wait if configured, otherwise five minutes; `10` is handy for testing). The app writes diagnostics to `%LOCALAPPDATA%\SentinelWatch\events.log`.
-
-## Build from source
-
-The repository includes both bundled video clips (`res/afk_bg_4k60.mp4` and `res/afk_bg_lite.mp4`); they make the initial Windows resource build large and slow.
-
-### Windows
-
-Use 64-bit MinGW-w64 with `g++` and `windres` on `PATH`:
+Use 64-bit MinGW-w64 with `g++` and `windres` available on `PATH`:
 
 ```bat
 mingw32-make
 ```
 
-This produces `sentinel.exe`. To build the test-only executable, use `mingw32-make TEST=1`; do not distribute `sentinel_test.exe`. If you do not have a compiler, `build_portable.bat` downloads a portable toolchain and builds without installing it. See `CLAUDE.md` for detailed build and test commands.
+This produces `sentinel.exe`. To compile the test-hook build, use `mingw32-make TEST=1`; **do not distribute `sentinel_test.exe`**. If you do not have a compiler, `build_portable.bat` downloads a portable toolchain and builds without installing it.
 
 ### Linux (Windows cross-build)
 
-Install MinGW-w64 and run:
+Install MinGW-w64 and the usual build tools (`make`, `bash`), then run:
 
 ```sh
 ./build.sh
 ```
 
-This creates `sentinel.exe`, not a native Linux program. Set `CROSS=x86_64-w64-mingw32-` if needed by your toolchain.
+The output is `sentinel.exe`, not a native Linux application. Set `CROSS=x86_64-w64-mingw32-` if your toolchain requires it.
 
-### macOS (native app)
+### macOS build
 
-Install Apple's command-line developer tools, then from the repository directory run:
+Install Apple's command-line developer tools, then run:
 
 ```sh
 xcode-select --install
 ./build.sh
 ```
 
-The app bundle is created at `build-mac/SentinelWatch.app`. The build selects Apple Silicon or Intel according to the Mac; use `make ARCH=x86_64` to build Intel on Apple Silicon. The Mac app has not yet been smoke-tested on real hardware.
+The app bundle is created at `build-mac/SentinelWatch.app`. The build targets the current Mac architecture; use `make ARCH=x86_64` to build for Intel on Apple Silicon. The app compiles in CI but has not yet been smoke-tested on real macOS hardware.
 
-## Settings and data
+## Tests
 
-- **Windows:** `%LOCALAPPDATA%\SentinelWatch` (settings, logs and user-provided AFK videos).
-- **macOS:** `~/Library/Application Support/SentinelWatch` (the `$SW_DATA_DIR` environment variable can override this location).
-- Settings are stored in `settings.json`. Close Sentinel before editing it; the app may rewrite its settings while running.
+Run the repository's native test suite with:
 
-Windows settings include switches for monitoring, strings scanning, startup behavior, power saving and updates. macOS has its own set of supported switches; Windows-only features such as power saving and automatic updates are not available there.
+```sh
+make tests
+```
 
-## Updates and trust
+The tests cover portable logic, including AFK timing and tier selection, strings scanning, startup behavior, update rules and the macOS app's portable core. Platform-specific behavior should also be tested on the corresponding real operating system; Wine results do not replace Windows or macOS hardware testing.
 
-On Windows, automatic updates are enabled by default and are downloaded from this repository's GitHub releases. The updater checks the downloaded executable against the release's SHA-256 manifest and installs it when the app is idle. You can turn this off in the Updates tab or settings.
+Other build and test targets are documented in the Makefile and `CLAUDE.md`. Do not ship test builds or enable test hooks in release builds.
 
-The executable is **not code-signed**. HTTPS and the published checksum help detect transfer errors or a mismatched download, but they do not protect against a compromised GitHub account or malicious release. Only install releases you trust. Automatic updating requires this repository to be public.
+## Architecture
+
+The code is organized around shared portable logic and OS-specific integrations:
+
+| Directory | Purpose |
+|---|---|
+| `shared/` | Common utilities, settings, platform selection, startup and power-saving rules, and update logic. |
+| `core/` | Windows monitoring, trust checks, event handling, strings scanning and updater integration. |
+| `ui/` | Windows tray, dashboard, notifications and graphics. |
+| `afk/` | Windows AFK screen lifecycle, video backends, assets and portable rendering/timing logic. |
+| `media-engine/` | D3D11 and Media Foundation video player exposed through a C ABI. |
+| `mac/` | macOS app, system integration, dashboard and command-line strings scanner. |
+| `tests/` | Portable unit tests, platform test harnesses and update/installer test scripts. |
+| `installer/` | Windows installer and macOS disk-image packaging scripts. |
+| `res/` | Windows resources, avatar and bundled AFK clips. |
+
+Windows settings and logs are stored under `%LOCALAPPDATA%\SentinelWatch`. On macOS, the data directory is `~/Library/Application Support/SentinelWatch`; `$SW_DATA_DIR` can override it. The Windows AFK delay is configured by `afkIdleSec` in `settings.json` (`0` uses the Windows screen-saver wait if configured, otherwise five minutes).
+
+## Security and updates
+
+The Windows updater downloads releases from this repository and verifies the executable against the release's SHA-256 manifest before installation. It is enabled by default and can be disabled in the Updates tab or settings.
+
+The applications are **not code-signed**. HTTPS and a release checksum help detect transfer errors or a mismatched download, but cannot protect against a compromised GitHub account or malicious release. Only install releases you trust. Automatic updating requires this repository to be public.
+
+The strings scan reads file content only; it does not execute programs or fetch detected links. Findings are leads for investigation, not a malware verdict. Scans are bounded in size and may not see packed, encrypted or non-text content.
 
 ## Known limitations
 
-- The Windows executable has not been validated on real Windows hardware with a real GPU. In particular, smooth 4K playback, audio, GPU selection, power-plan changes and display brightness need testing on actual devices.
-- The macOS app compiled on GitHub's macOS runner but has **never been launched on a Mac**. Its runtime behavior, permissions, Gatekeeper handling and disk image installation are not yet confirmed.
-- The macOS release is ad-hoc signed and not notarized. The app does not have the Windows version's automatic updater or power-saving feature.
-- The Rust daemon and named pipe described in the original architecture design are not implemented; monitoring runs in the app.
-- Bundled video clips and the avatar image are not covered by the MIT license; see `THIRD_PARTY.md`.
+- The Windows executable has not been validated on real Windows hardware with a real GPU. Smooth 4K playback, audio, GPU selection, power-plan changes and display brightness need testing on actual devices.
+- The macOS app compiled on GitHub's macOS runner but has **never been launched on a Mac**. Runtime behavior, permissions, Gatekeeper handling and disk-image installation are not yet confirmed.
+- The macOS build is ad-hoc signed and not notarized. It does not include the Windows automatic updater or power-saving feature.
+- The Rust daemon and named pipe from the original architecture design are not implemented; monitoring runs in the application.
 
-## License
+## License and third-party assets
 
-Sentinel's source code is available under the [MIT License](LICENSE), subject to the third-party asset terms in `THIRD_PARTY.md`.
+Source code is available under the [MIT License](LICENSE). The bundled video clips and avatar image are not covered by that license; see [`THIRD_PARTY.md`](THIRD_PARTY.md) for their terms.
