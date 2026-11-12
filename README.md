@@ -1,5 +1,15 @@
 # Sentinel Watch Suite
 
+## Authors
+
+<div align="left">
+  <a href="https://github.com/lIIusionator"><img src="https://github.com/lIIusionator.png?size=40" width="40" height="40" alt="lIIusionator" /></a>
+  <a href="https://github.com/JustZeal"><img src="https://github.com/JustZeal.png?size=40" width="40" height="40" alt="JustZeal" /></a>
+</div>
+
+- [lIIusionator](https://github.com/lIIusionator) — Author
+- [JustZeal](https://github.com/JustZeal) — Co-author
+
 A small system-monitoring suite for Windows and macOS. Sentinel watches processes, files and startup items, and includes an AFK screensaver. Windows also has an optional strings scan for links and suspicious commands inside flagged programs; it is on by default.
 
 Windows ships as one executable with both video clips embedded. The macOS version is a separate app. Sentinel is MIT-licensed; the bundled video clips and avatar image have separate terms (`THIRD_PARTY.md`).
