@@ -16,20 +16,24 @@ README.md has the user-facing description; this file is for whoever (human or AI
 * **Start with Windows, hidden in the tray** (the `autostart` switch) and **power saving after 30 minutes away** (Nov 7: "after 30 minutes afk turn laptop to power saving mode, lower power to under 30%, lower brightness").
   The second was read as: CPU maximum 25 % + display brightness at most 15 % while there has been no input for 30 min, undone at the first input. That reading was **not confirmed**: if "power" meant something else
   (the GPU?), change `shared/eco.h` and `core/eco.cpp`.
+* (Nov 9-12) Put the project on GitHub (`lIIusionator/Sentinel`, MIT, `LICENSE` / `THIRD_PARTY.md`), a Windows setup (`installer/windows/sentinel.nsi`), a Mac dmg (best effort), **release v1.0** and
+  **automatic updates from the repository's releases** (rule 16, README section 13). The repository must be public for the updates to work; making it public is the owner's decision.
 * The Rust daemon and the named pipe of the architecture document are **not** implemented; say so, once, when it matters.
 
 ## Commands
 ```
 mingw32-make                 # sentinel.exe (release). First build is slow: windres embeds 77 MB of video.
-                             # res/afk_bg_4k60.mp4 + res/afk_bg_lite.mp4 must exist (in sentinel-watch-full.zip, not in the small source zip: README "The two clips"; tools\make_clips.bat makes them)
+                             # res/afk_bg_4k60.mp4 + res/afk_bg_lite.mp4 must exist (they are in the repository: README "The two clips"; tools\make_clips.bat makes new ones)
 mingw32-make TEST=1          # sentinel_test.exe  (-DSW_TEST_HOOKS; env switches in afk/afk_controller.h). Never ship it.
-make tests                   # native unit tests, host g++ + bash:  62,579 (afk) + 113 (strings engine) + 21 (Mac tool, tests/mac_cli_test.sh) + 13 (autostart) + 43 (power saving) checks must pass,
+make tests                   # native unit tests, host g++ + bash:  62,579 (afk) + 113 (strings engine) + 21 (Mac tool, tests/mac_cli_test.sh) + 13 (autostart) + 43 (power saving) + 107 (updater) checks must pass,
                              # and on Linux / macOS 304 more for the Mac app's portable core (tests/mac_logic_tests.cpp)
 make macarm                  # mac/sentinel-strings.cpp for Apple Silicon: ZIG=<path to zig 0.17> (`pip install ziglang`); never run here, only inspected (llvm-objdump)
 make harness                 # harness.exe: CPU decode worker vs a scripted fake reader (Windows / Wine): 81 checks
 make pathtest                # path_unicode_test.exe: non-ASCII account names: 84 checks
 make idletest                # idle_cpu_test.exe (Windows / Wine): signed-file cache in isSigned + the [CPU] log line: 22 checks
 make dll                     # media_engine.dll (C ABI exports MediaEngine_*)
+tests/update_e2e.sh OLD NEW  # the automatic update under Wine against a fake release server (README section 13 builds the two test exes)
+tests/installer_test.sh      # the Windows setup under Wine, silent (needs Wine with 32-bit support: the NSIS setup is a 32-bit program)
 build_portable.bat           # Windows, no compiler needed: downloads WinLibs GCC 16.1.0 (264 MB) into C:\SentinelBuild once, then runs build.bat there.
                              # Tested only against stand-ins under Wine (tests/portable_build/README.txt); the real download/tar/GCC 16.1 build never ran here.
                              # Wine 9's cmd runs the right side of `a || b` even when `a` succeeded, so the Wine runs use tf.py to rewrite `||`; Windows is fine.
@@ -96,6 +100,13 @@ Expect **0 warnings** with `-Wall -Wextra` (the Makefile switches off `-Wmislead
     `apple.mm`, `app.mm` and `sys_mac.cpp`. Which OS is being built is decided in the `Makefile` (Windows_NT / Darwin / Linux), `build.sh` and `shared/platform.h` (`#error` on anything else). The Mac app has no power saving,
     no GPU tiers and no video check; its AFK screen is `AVQueuePlayer` + `AVPlayerLooper` with one log line two seconds in as the only evidence. Keep `mac/Info.plist` to the one protected folder it watches (Downloads).
     **It has never been compiled.**
+16. **Automatic updates** (Nov 11, v1.0). `shared/update.h` is pure logic (version compare, release JSON validation, SHA-256, `SHA256SUMS.txt`, the "installed before" guard; 107 checks in `tests/update_tests.cpp`);
+    `core/update.cpp` is the Windows side: WinHTTP loaded at run time (rule 3), one below-normal worker thread asleep on an event (rules 2 and 10: `CreateThread`, no `std::thread`, nothing periodic that costs CPU).
+    Trust = HTTPS + the GitHub account (the exes are not code-signed), so `updParseRelease` stays strict: not a draft / pre-release, a plain version tag newer than `SW_VERSION`, asset addresses only under
+    `https://github.com/<UPD_REPO>/releases/download/`, the exe's SHA-256 equal to its line in `SHA256SUMS.txt`. The swap runs on the UI thread (`updateTick`, the 1 s timer) only with no AFK screen, the dashboard hidden and
+    input idle >= 60 s; every failing step puts the old exe back. **Release procedure:** the tag `vX.Y.Z` must equal `SW_VERSION` (the workflow checks it, or an installed copy would download the release again and again);
+    assets `SentinelWatch.exe`, `SentinelWatch-Setup.exe`, `SHA256SUMS.txt`; the repository must be public (a private one answers 404). Test hooks (sentinel_test.exe only; plain http only there): `SW_TEST_UPDATE_URL`,
+    `SW_TEST_UPDATE_FIRST` (ms), `SW_TEST_UPDATE_IDLE` (s). Never run: real HTTPS / TLS to api.github.com and github.com, the swap with a real antivirus holding the file, a failing swap (the rollback code has no test), a real release.
 
 ## Verified here, and not
 Verified (Linux, mingw-w64 GCC 13 win32-model cross compiler, Wine 9.0, Zig 0.17 clang): clean builds, C++20/23 syntax, 62,579 native checks (also
@@ -120,6 +131,8 @@ Nov 7 (build `2026.11.07-afk4`), Linux / Wine only: start with Windows (13 check
 ASan + UBSan; Wine with fake in-memory plans: ON after the idle time, OFF about a second after real input, a killed run leaves the marker and the next start undoes it, a sign-out message puts the plan back first, an AFK screen that
 starts while it is on skips the video check; the early player and the video check were run again afterwards and still behave); the Mac app's portable core (304 checks, also ASan + UBSan). The 11 switches fit the Protection tab by
 geometry only (this Wine draws no text).
+Nov 11 (v1.0), Linux / Wine only: updater (107 logic checks, also ASan + UBSan; Wine end to end: install, wrong checksum, cut-off download, same version, pre-release, 404, switch off, dashboard open) and the Windows
+setup (silent install / uninstall under 32-bit-capable Wine; its pages were not clicked). The GitHub workflow (`.github/workflows/build.yml`) was only parsed as YAML.
 **Never run:** whether the early player + video check cure the "sometimes no video" symptom on the laptop (their cause there was never reproduced), whether 4 frames in 4.5 s is the right bar on the GTX 1050
 (a false FAIL costs one rebuild, then maybe a tier; the log line says which), a real GPU stuck in the way `SW_TEST_STUCK` imitates (that hook only imitates it); the strings scan on real Windows with real droppers; the Mac tool on a Mac (Gatekeeper / quarantine, `std::filesystem` there); **the Mac app** (never compiled: apple.mm, app.mm, sys_mac.cpp); the real `powrprof.dll` calls (Wine has none: whether a standard account may copy and switch power plans, whether the screen really dims and the CPU stays at 25 %, what AtlasOS's plan does with the values, how long the calls take on the UI thread); the text of the 11th Protection-tab row; real GPU decode / present of the 4K60 clip, whether renewing the player cures the 2nd-screen symptom on the laptop, how long a rebuild takes on the GTX 1050, the D2D HUD, audio, loop seam, display-off / lock, which adapter is picked, GCC 16.1 build, and the real cost of
 WinVerifyTrust on 100 MB signed exes (Wine has none): that the signature cache is what removed the always-on CPU use on the laptop is a diagnosis, not a measurement.

@@ -35,7 +35,7 @@ exit /b 1
 :noclips
 echo.
 echo The two AFK clips are missing: res\afk_bg_4k60.mp4 and res\afk_bg_lite.mp4.
-echo They are not in the source zip (74 MB). See README.md, section "The two clips":
+echo They are part of the repository (78 MB): is the checkout complete? See README.md, section "The two clips":
 echo copy them out of a sentinel.exe that has run once (%%LOCALAPPDATA%%\SentinelWatch\content\afk) or make them with tools\make_clips.bat.
 exit /b 1
 :fail

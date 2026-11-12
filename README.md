@@ -3,12 +3,26 @@
 A native Windows (C++17, 64-bit) file-change / process / autorun / token-theft monitor with a GDI+ dashboard and
 an **AFK screensaver**: a looping 4K 60 fps video with sound, a starfield, a camera-lens vignette, a clock and a quote.
 
-One `sentinel.exe`, statically linked, **both AFK video clips built into it** (they unpack themselves on first use).
+One statically linked exe, **both AFK video clips built into it** (they unpack themselves on first use).
 When it flags a program it also reads the program's strings for links and malware commands (section 10, on by default). It **starts with Windows, hidden in the tray**
-(the `autostart` switch, section 4). The same suite also exists as a **macOS app** (menu bar, dashboard, AFK screen; `mac/`, section 12) and as a small macOS command-line
+(the `autostart` switch, section 4) and **updates itself from this repository's releases** (section 13). The same suite also exists as a **macOS app** (menu bar, dashboard, AFK screen; `mac/`, section 12) and as a small macOS command-line
 version of the strings check (section 11). The build checks which OS it is running on and builds the matching one (section 1).
 
-Version v1.7, build id `2026.11.07-afk4` (`shared/version.h`).
+Version v1.0, build id `2026.11.11-v1.0` (`shared/version.h`). License: MIT (`LICENSE`); the two video clips and the avatar picture are **not** covered by it (`THIRD_PARTY.md`).
+
+## Download and install (Windows)
+
+Take the files from the [latest release](https://github.com/lIIusionator/Sentinel/releases/latest):
+
+| File | What it is |
+|---|---|
+| `SentinelWatch-Setup.exe` | the installer. For this user only, **no administrator rights**: it installs to `%LOCALAPPDATA%\Programs\SentinelWatch`, adds a Start menu entry and an uninstaller (Settings -> Apps) and starts the program |
+| `SentinelWatch.exe` | the same program as one file: put it in any folder you can write to and run it (nothing is installed) |
+| `SHA256SUMS.txt` | the SHA-256 of the two Windows files (the updater checks the one of `SentinelWatch.exe`; you can too: `certutil -hashfile SentinelWatch.exe SHA256`) |
+| `SentinelWatch-macOS.dmg` | the Mac app, **only on releases where the Mac build worked** (it has never been run on a Mac: section 12) |
+
+The files are **not code-signed** (no certificate): Windows SmartScreen shows "Windows protected your PC" the first time; "More info" -> "Run anyway". After that the program keeps itself
+up to date (section 13) and starts with Windows, hidden in the tray (double-click the tray icon to open it).
 
 ---------------------------------------------------------------------------------------------------------------------
 
@@ -44,8 +58,8 @@ The Makefile looks at `OS` / `uname -s` first (it prints `[OS] <name>`), and `bu
 The sources check too (`shared/platform.h`, included by `shared/sw_common.h` and `mac/core.cpp`): compiling a tree on the wrong OS stops with one clear `#error` instead of
 a page of "windows.h not found".
 
-* **The two video clips must be in `res\` before you build.** The full package (`sentinel-watch-full.zip`, three parts + `join_source.bat`) already has them there; the small
-  source zip does not (74 MB together; see "The two clips" below). `make` and `build.bat` stop with a clear message when they are missing.
+* **The two video clips must be in `res\` before you build.** They are part of this repository (78 MB, so a `git clone` takes a moment; see "The two clips" below).
+  `make` and `build.bat` stop with a clear message when they are missing.
 * The first build is slow in the resource step (`windres` embeds 77 MB of video, about 1 GB of RAM). After that `make`
   only recompiles what changed (header dependencies are tracked) and reuses the resource object.
 * Only C++17 is required; everything also compiles clean as C++20 and C++23 (checked with `-fsyntax-only`).
@@ -57,37 +71,34 @@ a page of "windows.h not found".
 | `make` | `sentinel.exe` |
 | `make TEST=1` | `sentinel_test.exe` (compiled with `-DSW_TEST_HOOKS`) |
 | `make dll` | `media_engine.dll`, the GPU player on its own behind the C ABI of `media-engine/include/media_engine.h` |
-| `make tests` | native unit tests of the pure logic, the autostart rule, the Mac app's portable core and the Mac command-line tool (host `g++` and `bash`, not the cross compiler; on a Mac `make tests` runs the Mac-side ones with Apple clang) |
+| `make tests` | native unit tests of the pure logic, the autostart rule, the updater's rules, the Mac app's portable core and the Mac command-line tool (host `g++` and `bash`, not the cross compiler; on a Mac `make tests` runs the Mac-side ones with Apple clang) |
 | `make macarm` | the Mac command-line tool cross-built for Apple Silicon with Zig (`ZIG=path\to\zig`); on a Mac see section 11 |
 | `make run` | on a Mac only: builds `SentinelWatch.app` and opens it |
 | `make harness` | `harness.exe`: the CPU renderer's decode worker against a scripted fake video reader (Windows or Wine) |
 | `make pathtest` | `path_unicode_test.exe`: data folder / log / settings under accented, Vietnamese, Japanese and emoji account names |
 | `make idletest` | `idle_cpu_test.exe`: the signed-file cache of the signature check and the `[CPU]` log line (Windows or Wine) |
 | `make clean` | removes build output |
+| `tests/update_e2e.sh <old.exe> <new.exe>` | not a make target: the automatic update end to end under Wine, against a fake release server (section 13) |
+| `tests/installer_test.sh` | not a make target: the Windows setup under Wine, silent install and uninstall (needs Wine with 32-bit support: the setup is a 32-bit program) |
 
 ### The two clips
 
 `res\afk_bg_4k60.mp4` (65.5 MB: 3840x2160, 60 fps, H.264 + AAC) and `res\afk_bg_lite.mp4` (12.4 MB: 1920x1080, 30 fps) are what `windres`
-embeds. **The full package has both in `res\`: join the parts with `join_source.bat` (it checks the result), unzip, build, and there is nothing else to fetch.**
-The small source zip leaves them out (together they are far bigger than the rest of the project). If you only have that one, two ways to put them back:
+embeds. **Both are in this repository: clone, build, and there is nothing else to fetch.** (They are not covered by the MIT license: `THIRD_PARTY.md`.)
 
-1. **Take them from the `sentinel.exe` you were given.** Start it once; within a few seconds its AFK thread unpacks both clips into
-   `%LOCALAPPDATA%\SentinelWatch\content\afk\` (the log says `unpacked ...`). Copy
-   `sentinel_afk_4k60.mp4` to `res\afk_bg_4k60.mp4` and `sentinel_afk_1080p30.mp4` to `res\afk_bg_lite.mp4`. These are the exact files that were embedded,
-   so the rebuilt exe is the same one.
-2. **Make them from your own video** (any resolution / frame rate, with ffmpeg + libx264 on `PATH`):
-   `tools\make_clips.bat "C:\path\to\video.mp4"` writes both files into `res\` with the settings the built-in clips were made with (H.264, because
-   HEVC needs a Windows extension that slimmed-down installs lack; ffmpeg itself decodes HEVC sources without it).
+To use **your own video** instead, with ffmpeg + libx264 on `PATH`:
+`tools\make_clips.bat "C:\path\to\video.mp4"` (any resolution / frame rate) writes both files into `res\` with the settings the built-in clips were made with (H.264, because
+HEVC needs a Windows extension that slimmed-down installs lack; ffmpeg itself decodes HEVC sources without it). A clip that is missing stops `make` / `build.bat` before anything is compiled.
+Both clips are also unpacked by a running `sentinel.exe` into `%LOCALAPPDATA%\SentinelWatch\content\afk\` (`sentinel_afk_4k60.mp4`, `sentinel_afk_1080p30.mp4`), which is where `build_portable.bat` looks if `res\` has none.
 
 ### Build without installing a compiler
 
 `build_portable.bat` builds `sentinel.exe` on a PC that has no C++ compiler. Nothing gets installed: it downloads a portable MinGW-w64
 (WinLibs GCC 16.1.0, POSIX threads, SEH, MSVCRT: a 264 MB zip from GitHub) **once**, unpacks it into `C:\SentinelBuild\toolchain`, and compiles there.
 
-1. Put `build_portable.bat` next to `sentinel-watch-src.zip` (or inside the unpacked `sentinel-watch` folder) and double-click it.
+1. Clone this repository (or "Code" -> "Download ZIP" on GitHub and unpack it) and double-click `build_portable.bat` in that folder.
 2. It needs Windows 10/11 (`curl.exe` and `tar.exe` are part of Windows), an internet connection on the first run, and about 2 GB free on `C:`.
-3. The two clips must be available (see "The two clips"). The script copies them by itself from
-   `%LOCALAPPDATA%\SentinelWatch\content\afk\`, which `sentinel.exe` fills the first time it runs; it checks this **before** it downloads anything.
+3. The two clips are in `res\` (see "The two clips"); the script checks this **before** it downloads anything.
 4. The result is `sentinel.exe` next to the script (`sentinel_built.exe` if a `sentinel.exe` is already there). Sources and compiler stay in
    `C:\SentinelBuild`; delete that folder and nothing is left behind (no installer, registry entry or PATH change).
 5. A failed build prints the compiler's messages and saves them to `C:\SentinelBuild\sentinel-watch\build\build.log`: that file is what to send.
@@ -108,11 +119,13 @@ Windows' own `tar.exe` on that zip, and compiling with that exact GCC 16.1.0.
 ```
 shared/          sw_common (log, paths, UTF-8 helpers), settings.json load/save, version, small lock/COM helpers, platform.h (which OS this is),
                  autostart.h ("Start with Windows": the Run value and how the autorun watch recognises it; pure logic),
-                 eco.h ("Power saving when away": when it starts and stops, how it gets back, the numbers; pure logic over a small interface)
+                 eco.h ("Power saving when away": when it starts and stops, how it gets back, the numbers; pure logic over a small interface),
+                 update.h ("Automatic updates": version compare, which release is acceptable, SHA-256, the checksum file; pure logic, section 13)
 core/            the monitors: autorun_watch, proc_watch (WMI process-creation feed), file_watch (ReadDirectoryChangesW),
                  token_guard, trust (Authenticode), response (block in Windows Firewall), events (the shared feed),
                  str_scan.cpp (reads a flagged program's strings off-thread) + str_scan.h (the pure logic, no Windows headers),
-                 eco.cpp (power saving after 30 min without input: a temporary copy of the power plan through powrprof.dll, loaded at run time; marker file)
+                 eco.cpp (power saving after 30 min without input: a temporary copy of the power plan through powrprof.dll, loaded at run time; marker file),
+                 update.cpp (automatic updates: WinHTTP loaded at run time, one worker thread, the swap of the exe)
 mac/             the macOS app (section 12): core.cpp + sys.h (portable logic, tested on any host), sys_mac.cpp + apple.mm (libproc, codesign, CoreGraphics,
                  FSEvents), app.mm (AppKit: menu bar, WKWebView dashboard, toast, AVFoundation AFK screen), ui/dashboard.html, content/, Info.plist, mac.mk;
                  sentinel-strings.cpp: the strings check as a macOS command-line tool (same str_scan.h, section 11)
@@ -128,10 +141,12 @@ afk/             the AFK screen
 media-engine/    D3D11 + Media Foundation Media Engine player behind the C ABI
                    MediaEngine_Init / Pump / RenderFrame(Ex) / SetPlaybackState / Resize / SetVolume / GetStats / Shutdown
 third_party/     mfmediaengine.h (the Media Engine interfaces; MinGW's headers lack them)
-res/             sentinel.rc, avatar.jpg; afk_bg_4k60.mp4 and afk_bg_lite.mp4 go here too (in the full package, not in the small source zip: see "The two clips")
-tests/           afk_tests.cpp, str_scan_tests.cpp, autostart_tests.cpp, eco_tests.cpp, mac_logic_tests.cpp, mac_cli_test.sh (native), cpu_decode_harness.cpp, path_unicode_test.cpp,
-                 idle_cpu_test.cpp (Wine/Windows)
+res/             sentinel.rc, avatar.jpg, afk_bg_4k60.mp4 and afk_bg_lite.mp4 (the two clips: see "The two clips")
+tests/           afk_tests.cpp, str_scan_tests.cpp, autostart_tests.cpp, eco_tests.cpp, update_tests.cpp, mac_logic_tests.cpp, mac_cli_test.sh (native), cpu_decode_harness.cpp,
+                 path_unicode_test.cpp, idle_cpu_test.cpp (Wine/Windows), update_e2e.sh + fake_release_server.py (the update end to end under Wine, section 13)
 tools/           make_clips.bat (makes the two clips from your video), v13_reference_noblob.cpp (the old single-file version, kept for reference only, not built)
+installer/       windows/sentinel.nsi (the Windows setup, NSIS), macos/make_dmg.sh (the Mac disk image)
+.github/workflows/build.yml   tests, the Windows exe + setup, the Mac dmg, and the release when a version tag is pushed (section 13)
 build_portable.bat   builds without a compiler installed (downloads a portable one); build.bat is the plain build, make is the Makefile build
 ```
 
@@ -188,7 +203,7 @@ Edit it while the app is closed (the app rewrites the file whenever a toggle or 
 | `afkGpu` | `"default"`, `"intel"`, `"nvidia"`, `"amd"` | which graphics chip plays the video on a PC with two. `default` lets Windows choose |
 | `afkMinTier` | `0`..`2` | the app's own memory (0 = try everything). Set to `0` to force a fresh try of every tier |
 | `afkStrikes`, `afkMinTierAt`, `afkBuild` | | bookkeeping behind the memory; leave them alone |
-| `autorun proc file allfiles tokens strings notify beep ignoresys autostart eco` | `true` / `false` | the protection toggles shown on the dashboard (`strings` = the strings scan, section 10; `autostart` = start with Windows and `eco` = power saving when away, both below; `strings`, `autostart` and `eco` are on by default) |
+| `autorun proc file allfiles tokens strings notify beep ignoresys autostart eco update` | `true` / `false` | the toggles shown on the dashboard (`strings` = the strings scan, section 10; `autostart` = start with Windows and `eco` = power saving when away, both below; `update` = automatic updates, section 13, the "AUTO-UPDATE" switch on the Updates tab; `strings`, `autostart`, `eco` and `update` are on by default) |
 | `splashMs`, `dashW`, `dashH` | numbers | splash time and dashboard size |
 
 The same text is written to `content\afk\README.txt` on every start.
@@ -225,7 +240,7 @@ performance*, or set `"afkGpu": "nvidia"`.
 
 Everything the AFK screen does is logged, with HRESULTs. Tags: `[AFK]` decisions, `[AFKVID]` video, `[AFKVID] stats` every 5 s while the screen is up,
 `[AFK-GPU] [ME]` the GPU player's own lines (its events, the result of every first `Play` / `Pause`, why a first frame took long), `[STR]` the strings scan of a flagged
-program (section 10), `[AUTOSTART]` the start-with-Windows switch and `[ECO]` power saving when away (section 4).
+program (section 10), `[AUTOSTART]` the start-with-Windows switch, `[ECO]` power saving when away (section 4) and `[UPD]` the automatic update (section 13).
 
 A healthy 4K start looks like:
 
@@ -254,7 +269,7 @@ events the player saw), `source attempt N ... shows no sign of life` and `media 
 ```
 
 Thread names: `ui` (message loop and the dashboard repaint), `afk` (the AFK screen), `tokenguard`, `wmi` (process watch), `dir` (AppData file watch),
-`scan` (the 5-minute scan), `cpu-video` / `cpu-audio` (CPU renderer); `tid N` is a thread the app did not name (Media Foundation, GDI+, driver).
+`scan` (the 5-minute scan), `update` (the update check), `cpu-video` / `cpu-audio` (CPU renderer); `tid N` is a thread the app did not name (Media Foundation, GDI+, driver).
 No `[CPU]` line = the app stayed under 3 %. With the AFK screen down the app should be close to idle; if a line appears then, it says what to look at.
 The dashboard repaints at once when something changes and a few times a second otherwise (once a second while another window has the focus);
 the signature check of a running app is done once per file version and then remembered.
@@ -306,7 +321,13 @@ Verified:
   lower tier `there is no lower tier` and `NO MOVING VIDEO was shown`. **Not proven:** that this cures the "video sometimes missing" report on your laptop. That cause was never reproduced: what was
   found is a flaw in the logs of the repeat runs (the player was replaced only when the screen was already due, so every later screen started on a player that was still loading); the video check and the
   log lines are the net under anything else
-* the static import list is the original one plus GDI32 and WINMM
+* **107 checks** for the updater's rules (`shared/update.h`: version compare, SHA-256 against the standard test vectors, the JSON reader, which releases are accepted and which refused, the checksum file,
+  the "installed before" guard, https-only addresses; also under ASan + UBSan). Under Wine, `tests/update_e2e.sh` runs the real exe against a fake release server on the same PC: a newer release is
+  downloaded, checked, swapped in and the new copy starts (exactly one restart, `.old` removed, `update_applied.txt` written); a wrong checksum, a cut-off download, the same version, a pre-release, a missing
+  release (404) and the switch off each leave the exe untouched; with the dashboard open the update is downloaded but not installed
+* the Windows setup, run silently under Wine (`tests/installer_test.sh`, built around a stand-in exe): it closes a running copy, replaces the program file, removes the leftovers of an update, writes the start menu
+  link and the uninstall entry; the uninstaller removes all of it plus the "start with Windows" value and keeps the data folder (a silent uninstall never asks)
+* the static import list is the original one plus GDI32 and WINMM (the updater adds none: WinHTTP is loaded at run time)
 * three independent code reviews (CPU back-end, controller, GPU player); every confirmed finding is fixed, apart from the blind-mode weakness, which is documented below
 * the Wine runs also exercise the real Media Engine code path as far as Wine goes (it loads the clip, sends the events, captures the first frame; it never signals
   new frames, so blind mode and the watchdog downgrade are what gets tested)
@@ -322,6 +343,9 @@ Verified:
 * **power saving on real Windows**: the real `powrprof.dll` calls (Wine has none: there the log says `powrprof.dll does not offer the power-plan functions`); whether a standard account may copy and
   switch power plans (an access error is logged, not hidden); that the screen really dims, the CPU really stays at 25 % (Task Manager -> Performance -> CPU -> Speed) and that your own brightness and plan come
   back; what the copied values do on AtlasOS's power plan; how long the calls take (they run on the UI thread)
+* **the update against real GitHub**: the real HTTPS / TLS call of WinHTTP to `api.github.com` and the redirect from `github.com/.../releases/download/` to GitHub's download servers (the fake server speaks plain http, and only
+  test builds allow that); the swap with a real antivirus or SmartScreen looking at the new file; a rollback after a failed swap (the code is there, no test makes it fail on purpose); the setup's pages and its "delete the data folder?" question (nobody can click them here) and its use
+  on real Windows; the GitHub workflow (`.github/workflows/build.yml`: it was only parsed, GitHub runs it for the first time on the first push); the Mac dmg
 * the Mac tool on a Mac: no macOS was available, so the Apple Silicon build was never run (Gatekeeper's reaction, `std::filesystem` on macOS and the first-run steps in section 11 are unchecked)
 * **the Mac app (section 12) has never been compiled**: `apple.mm`, `app.mm` and `sys_mac.cpp` (AppKit, WKWebView, AVFoundation, CoreGraphics, FSEvents, libproc, `codesign`) are untested, and so are Gatekeeper,
   the Downloads permission prompt and the LaunchAgent on a real Mac
@@ -340,6 +364,8 @@ Verified:
 * Strings scan: see the limits at the end of section 10.
 * Power saving (section 4) looks at input only, makes its power-plan calls on the UI thread (if the Windows power service stalls, so do the tray and the dashboard; the AFK screen has its own thread),
   leaves the AFK video running, and does not judge the AFK player while it is on (a screen that fails only under the cap goes unnoticed).
+* Automatic updates (section 13): Windows only (the Mac app does not update itself); the exes are not code-signed, so what protects an update is HTTPS, the GitHub account that owns the repository and the checksum in the release;
+  the repository must be public; the app must be able to write next to its own exe (an install under `C:\Program Files` would need administrator rights: the installer uses `%LOCALAPPDATA%\Programs` for that reason).
 
 ## 9. Test hooks (`sentinel_test.exe` only)
 
@@ -348,7 +374,9 @@ block in the first GPU start - `SW_TEST_NOINPUT=1` ignore real input - `SW_TEST_
 `SW_TEST_EVERY=<s>` repeat the idle period every s seconds (several AFK screens in one run) - `SW_TEST_DASH=min|close` start with the dashboard minimized / closed to the tray -
 `SW_TEST_STUCK=<n>` the first n GPU players ignore the request to play (exercises the video check) -
 `SW_TEST_ECO=<s>` power saving after s seconds without input, or `SW_TEST_ECO=<at>,<for>` "away" from second `at` for `for` seconds whatever the input does (a window that appears counts as input under Wine);
-the power plans are in-memory fakes, `SW_TEST_ECO_REAL=1` makes the real calls.
+the power plans are in-memory fakes, `SW_TEST_ECO_REAL=1` makes the real calls -
+`SW_TEST_UPDATE_URL=<http://host:port/path>` ask this address instead of GitHub's (plain http is allowed only in the test exe; the asset addresses in the answer must start with the same `http://host:port/`) -
+`SW_TEST_UPDATE_FIRST=<ms>` first look after this long instead of 90 s - `SW_TEST_UPDATE_IDLE=<s>` how long the PC must be idle before an update is installed (default 60; `0` for tests).
 Under Wine note: a `LOCALAPPDATA` given from the shell is ignored by Wine, `LANG=C.UTF-8` is needed for non-ASCII file names, and Wine's D3D11 is a slow
 fake adapter.
 
@@ -462,3 +490,55 @@ Switches (Protection tab; the same names as in `settings.json`): `autorun proc f
 
 **Not there, on purpose:** the GPU tiers, the video check and the watchdog (AVFoundation does the playing; the log line above is the only evidence), power saving, Endpoint Security (needs an Apple
 entitlement), a signed / notarised build (this one is ad-hoc signed: it runs on the Mac that built it).
+
+---------------------------------------------------------------------------------------------------------------------
+
+## 13. Automatic updates (Windows)
+
+While the program runs it asks this repository's GitHub releases whether a newer version exists, downloads it, checks it, and swaps its own exe for it **when you are away from the PC**. No prompt.
+Switch: `update` in `settings.json` (on by default; the "AUTO-UPDATE" chip on the Updates tab). The Updates tab also shows the status ("Up to date (v1.0), checked 14:03", "Downloading v1.0.1... 42 %",
+"v1.0.1 downloaded: installs when you are away from the PC") and has a **Check now** button.
+
+**How it works** (`shared/update.h` = the rules, `core/update.cpp` = the Windows side)
+1. 90 seconds after the start, then every 12 hours (30 minutes after a failed check), a worker thread (below normal priority, asleep the rest of the time) asks
+   `https://api.github.com/repos/lIIusionator/Sentinel/releases/latest`.
+2. The release is used only if it is **not a draft and not a pre-release**, its tag is a plain version (`v1.0.1`, `1.2`) **newer than the running one**, and it has the assets `SentinelWatch.exe` and
+   `SHA256SUMS.txt` whose addresses start with `https://github.com/lIIusionator/Sentinel/releases/download/`.
+3. It downloads `SHA256SUMS.txt`, then `SentinelWatch.exe` to `<exe>.new` (the SHA-256 is computed while it downloads; at most 400 MiB). The hash must equal the one in `SHA256SUMS.txt`,
+   otherwise `.new` is deleted and the log says so.
+4. A downloaded update is installed only when **nothing is in the way**: no AFK screen, the dashboard hidden (the program sits in the tray) and **no keyboard or mouse input for 60 seconds**.
+   Then the running exe is renamed to `<exe>.old`, `.new` becomes the exe, the program starts the new exe with `--background --after-update`, writes `update_applied.txt` and exits.
+   Any step that fails puts everything back and the log says which.
+5. The new copy waits (up to 20 s) until the old one has let go of the single-instance mutex, deletes `<exe>.old` / `<exe>.new`, and carries on in the tray.
+
+If a release's exe still said an older version than its tag, every check would download it again. `update_applied.txt` stops that (`[UPD] ... was installed before, but this program still calls itself ...: not downloading it again`),
+and the release workflow refuses a tag that is not `SW_VERSION`.
+
+**Security model.** The exes are **not code-signed**, so what protects an update is HTTPS to GitHub, the GitHub account that owns the repository, and the checksum in the release. The checksum catches a damaged or cut-off
+download; it does **not** protect against someone who controls the release itself (they could replace both files). **Whoever can publish a release here can run code on every PC that has the program: keep 2FA on
+the account and publish releases yourself.** Nothing is fetched from anywhere but `api.github.com` and `github.com/<repo>/releases/download/` (GitHub then redirects the download to its own servers). The request is a plain GET without
+cookies or an account; GitHub sees the IP address and `User-Agent: SentinelWatch/<version>`.
+
+**The repository must be public.** The check is an unauthenticated call to GitHub's API: for a private repository GitHub answers "404 Not Found" (the log says `no published release`) and nothing is ever updated.
+
+**Files.** `<exe>.new` (the download, while it waits), `<exe>.old` (only between the swap and the next start), `%LOCALAPPDATA%\SentinelWatch\update_applied.txt`. The program must be able to write next to its own exe: the setup
+installs to `%LOCALAPPDATA%\Programs\SentinelWatch` for that reason. The file watcher ignores any path that contains `\sentinelwatch\`, so the swap in that folder raises no alert; an exe kept in a watched folder (Downloads, say)
+may be reported once as a new unsigned program after an update.
+
+**Log.** `[UPD]` lines: `up to date`, `<tag> is available ...: downloading`, `<tag> downloaded, SHA-256 matches`, `installed <tag> ...: restarting`, `check failed: <why>`, `cannot install <tag>: <why>`.
+
+**Publishing a release** (whoever maintains the repository)
+1. Change `SW_VERSION` in `shared/version.h` (`"v1.0.1"`), and `SW_BUILD_ID` if the AFK behaviour changed (rule 6 in `CLAUDE.md`). Commit and push to `main`.
+2. Wait until the push is green (Actions tab), then tag it: `git tag v1.0.1 && git push origin v1.0.1`. The workflow (`.github/workflows/build.yml`) checks that the tag is `SW_VERSION`, runs the tests, builds
+   `SentinelWatch.exe` and `SentinelWatch-Setup.exe`, writes `SHA256SUMS.txt` (of both) and publishes the release with the three files; the Mac job adds `SentinelWatch-macOS.dmg` if it works.
+3. Installed copies find it within 12 hours and install it when their PC is idle. A draft or pre-release is ignored by them: use that to try the workflow without updating anybody.
+4. Without GitHub Actions: build (`./build.sh`, then `makensis -DEXE=<SentinelWatch.exe> -DVERSION=1.0.1 -DOUT=SentinelWatch-Setup.exe installer/windows/sentinel.nsi`), run
+   `sha256sum SentinelWatch.exe SentinelWatch-Setup.exe > SHA256SUMS.txt`, create the release by hand (Releases -> Draft a new release, tag `v1.0.1`) and drag the three files in. Publish last: the files must all be there.
+
+**Tests.** `make tests` runs `tests/update_tests.cpp` (107 checks). The end-to-end run under Wine needs two test exes that differ only in their version:
+```sh
+make CROSS=x86_64-w64-mingw32- TEST=1                                   # sentinel_test.exe, says v1.0
+CXXFLAGS='-O2 -DSW_VERSION_OVERRIDE=\"v1.0.1\"' make CROSS=x86_64-w64-mingw32- TEST=1 BUILD=build-test-b OUT=sentinel_test_b.exe
+tests/update_e2e.sh sentinel_test.exe sentinel_test_b.exe               # Wine, Xvfb and python3
+```
+It does not cover real HTTPS to GitHub (see section 7).

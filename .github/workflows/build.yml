@@ -1,0 +1,133 @@
+# build.yml -- every push runs the tests and builds the Windows exe and setup. Pushing a version tag (v1.0, v1.0.1, ...) also publishes the release
+# that installed copies update themselves from (README section 13): the tag must be the version in shared/version.h, the "windows" job checks that.
+#   release:  edit SW_VERSION in shared/version.h, commit, push, then   git tag v1.0.1 && git push origin v1.0.1
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write        # the release and the ci-logs branch (a pull request from a fork gets a read-only token whatever is written here)
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: make tests 2>&1 | tee tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: log-tests
+          path: tests.log
+
+  windows:
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version (a tag must be the program's own version)
+        run: |
+          ver=$(sed -n 's/^#define SW_VERSION  *"\([^"]*\)".*/\1/p' shared/version.h | head -n1)
+          [ -n "$ver" ] || { echo "::error::no SW_VERSION in shared/version.h"; exit 1; }
+          echo "VER=${ver#v}" >> "$GITHUB_ENV"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$ver" ]; then
+            echo "::error::the tag $GITHUB_REF_NAME is not the program's version $ver (shared/version.h): an installed copy would download it again and again"
+            exit 1
+          fi
+      - name: Tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mingw-w64 g++-mingw-w64-x86-64 nsis
+      - name: Build the exe, the setup and the checksums
+        run: |
+          {
+            ./build.sh
+            if strings -a sentinel.exe | grep -q SW_TEST; then echo "::error::test hooks are in the release exe"; exit 1; fi
+            mkdir -p dist
+            cp sentinel.exe dist/SentinelWatch.exe
+            makensis -V2 -DEXE="$PWD/dist/SentinelWatch.exe" -DVERSION="$VER" -DOUT="$PWD/dist/SentinelWatch-Setup.exe" installer/windows/sentinel.nsi
+            (cd dist && sha256sum SentinelWatch.exe SentinelWatch-Setup.exe > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          } 2>&1 | tee windows.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: dist/*
+      - name: Publish the release (tags only)
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          notes="Windows: run SentinelWatch-Setup.exe (no administrator rights needed), or use SentinelWatch.exe on its own. The files are not code-signed, so Windows SmartScreen asks once: More info, then Run anyway. A copy that is already installed updates itself from releases like this one. SHA256SUMS.txt has the SHA-256 of each file."
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --title "Sentinel Watch $GITHUB_REF_NAME" --notes "$notes" --generate-notes
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: log-windows
+          path: windows.log
+
+  mac:
+    needs: windows               # on a tag the release exists by now: the Mac build can never hold it back
+    runs-on: macos-latest
+    continue-on-error: true      # shortcut: the Mac app has never been compiled, so a failed Mac build must not fail the run; remove once it builds
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the app and the disk image
+        run: |
+          {
+            ./build.sh
+            bash installer/macos/make_dmg.sh build-mac/SentinelWatch.app SentinelWatch-macOS.dmg
+          } 2>&1 | tee mac.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-macos
+          path: SentinelWatch-macOS.dmg
+      - name: Add the disk image to the release (tags only)
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "$GITHUB_REF_NAME" SentinelWatch-macOS.dmg --clobber
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: log-mac
+          path: mac.log
+
+  report:
+    needs: [tests, windows, mac]
+    if: always()
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: log-*
+          merge-multiple: true
+          path: logs
+      - name: Push the logs to the ci-logs branch
+        # shortcut: the logs go to a branch so they can be read where the Actions pages / API cannot be reached; delete this job when nobody needs that
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTS: tests=${{ needs.tests.result }} windows=${{ needs.windows.result }} mac=${{ needs.mac.result }}
+        run: |
+          mkdir -p logs && cd logs
+          { echo "run $GITHUB_RUN_ID  ref $GITHUB_REF_NAME  commit $GITHUB_SHA"; echo "$RESULTS"; } > summary.txt
+          git init -q -b ci-logs
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add -A
+          git commit -q -m "CI logs of run $GITHUB_RUN_ID"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-logs

@@ -60,9 +60,9 @@ SRC        = $(SRC_SHARED) $(SRC_CORE) $(SRC_UI) $(SRC_AFK) $(SRC_ENGINE)
 OBJ        = $(patsubst %.cpp,$(BUILD)/%.o,$(SRC))
 RES        = $(BUILD)/res/sentinel.res.o
 
-# The two AFK clips are not in the source zip (74 MB). Say so before anything is compiled, whenever the exe is what is being built.
+# The two AFK clips (78 MB) are part of the repository. Say so before anything is compiled if they are missing, whenever the exe is what is being built.
 CLIPS      = res/afk_bg_4k60.mp4 res/afk_bg_lite.mp4
-CLIP_HELP  = The two AFK clips are not in the source zip (74 MB): see the section "The two clips" in README.md
+CLIP_HELP  = The two AFK clips belong in res/ (they are part of the repository: is the checkout complete?): see the section "The two clips" in README.md
 CLIP_MISSING = $(strip $(foreach c,$(CLIPS),$(if $(wildcard $(c)),,$(c))))
 ifneq ($(and $(CLIP_MISSING),$(filter-out clean dll tests harness pathtest idletest,$(or $(MAKECMDGOALS),all))),)
 $(error Cannot build the exe, not found: $(CLIP_MISSING) -- $(CLIP_HELP))

@@ -4,7 +4,7 @@
 #
 #   usage: tests/update_e2e.sh <old.exe> <new.exe>
 #   old.exe  a test build (make TEST=1) -- says v1.0
-#   new.exe  the same sources built as v1.0.1 (see "Tests" in README.md):
+#   new.exe  the same sources built as v1.0.1 (README section 13):
 #            CXXFLAGS='-O2 -DSW_VERSION_OVERRIDE=\"v1.0.1\"' make TEST=1 BUILD=build-test-b OUT=sentinel_test_b.exe
 # Needs Wine (wine64), Xvfb and python3. Real HTTPS to GitHub is NOT covered: the fake server speaks plain http (only test builds allow that).
 set -u
