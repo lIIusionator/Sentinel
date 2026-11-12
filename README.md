@@ -19,7 +19,7 @@ Take the files from the [latest release](https://github.com/lIIusionator/Sentine
 | `SentinelWatch-Setup.exe` | the installer. For this user only, **no administrator rights**: it installs to `%LOCALAPPDATA%\Programs\SentinelWatch`, adds a Start menu entry and an uninstaller (Settings -> Apps) and starts the program |
 | `SentinelWatch.exe` | the same program as one file: put it in any folder you can write to and run it (nothing is installed) |
 | `SHA256SUMS.txt` | the SHA-256 of the two Windows files (the updater checks the one of `SentinelWatch.exe`; you can too: `certutil -hashfile SentinelWatch.exe SHA256`) |
-| `SentinelWatch-macOS.dmg` | the Mac app, **only on releases where the Mac build worked** (it has never been run on a Mac: section 12) |
+| `SentinelWatch-macOS.dmg` | the Mac app, **only on releases where the Mac build worked** (built by GitHub's macOS runner; it has never been *run* on a Mac: section 12) |
 
 The files are **not code-signed** (no certificate): Windows SmartScreen shows "Windows protected your PC" the first time; "More info" -> "Run anyway". After that the program keeps itself
 up to date (section 13) and starts with Windows, hidden in the tray (double-click the tray icon to open it).
@@ -343,12 +343,13 @@ Verified:
 * **power saving on real Windows**: the real `powrprof.dll` calls (Wine has none: there the log says `powrprof.dll does not offer the power-plan functions`); whether a standard account may copy and
   switch power plans (an access error is logged, not hidden); that the screen really dims, the CPU really stays at 25 % (Task Manager -> Performance -> CPU -> Speed) and that your own brightness and plan come
   back; what the copied values do on AtlasOS's power plan; how long the calls take (they run on the UI thread)
-* **the update against real GitHub**: the real HTTPS / TLS call of WinHTTP to `api.github.com` and the redirect from `github.com/.../releases/download/` to GitHub's download servers (the fake server speaks plain http, and only
-  test builds allow that); the swap with a real antivirus or SmartScreen looking at the new file; a rollback after a failed swap (the code is there, no test makes it fail on purpose); the setup's pages and its "delete the data folder?" question (nobody can click them here) and its use
-  on real Windows; the GitHub workflow (`.github/workflows/build.yml`: it was only parsed, GitHub runs it for the first time on the first push); the Mac dmg
+* **the update against a real release**: under Wine the release exe made a real TLS connection to `api.github.com` (certificate accepted, request and `User-Agent` as intended) and GitHub answered 403, the anonymous
+  rate limit (60 requests an hour per IP address) of the machine it ran on, so no real release answer was ever parsed, and neither was the redirect from `github.com/.../releases/download/` to GitHub's download servers
+  (the fake server speaks plain http, and only test builds allow that). A 403 or 429 from GitHub is logged as `check failed: HTTP 403 ...` and tried again after 30 minutes; the swap with a real antivirus or SmartScreen looking at the new file; a rollback after a failed swap (the code is there, no test makes it fail on purpose); the setup's pages and its "delete the data folder?" question (nobody can click them here) and its use
+  on real Windows; the release step of the GitHub workflow (`.github/workflows/build.yml`; its first run, on `main`, passed: tests, Windows exe + setup, Mac app + dmg); the Mac dmg on a Mac
 * the Mac tool on a Mac: no macOS was available, so the Apple Silicon build was never run (Gatekeeper's reaction, `std::filesystem` on macOS and the first-run steps in section 11 are unchecked)
-* **the Mac app (section 12) has never been compiled**: `apple.mm`, `app.mm` and `sys_mac.cpp` (AppKit, WKWebView, AVFoundation, CoreGraphics, FSEvents, libproc, `codesign`) are untested, and so are Gatekeeper,
-  the Downloads permission prompt and the LaunchAgent on a real Mac
+* **the Mac app (section 12) has never been run**: GitHub's macOS runner compiled it for the first time (Apple clang, arm64, no warnings, `.app` + `.dmg` made), but `apple.mm`, `app.mm` and `sys_mac.cpp` (AppKit, WKWebView,
+  AVFoundation, CoreGraphics, FSEvents, libproc, `codesign`) have not been started once, and neither have Gatekeeper, the Downloads permission prompt and the LaunchAgent on a real Mac
 * what does **not** exist in this environment: HEVC / H.264 decoding under Wine (the CPU tier ends in "no video" there), so CPU-tier *decoding* is covered by the
   harness only, not by a real clip
 
@@ -437,9 +438,9 @@ It is **not** the whole Sentinel: there is no dashboard, no AFK screen, no folde
 
 ## 12. macOS app (menu bar, dashboard, AFK screen)
 
-**Never compiled and never run.** It was written on Linux without a Mac. What was tested is the part that has no Apple code in it (`mac/core.cpp`, 304 checks against a fake operating system, also
-under ASan + UBSan). `apple.mm`, `app.mm` and `sys_mac.cpp` (AppKit, WKWebView, AVFoundation, CoreGraphics, FSEvents, libproc, `codesign`) have only been read: expect compiler errors on the
-first build, and send them back verbatim.
+**Compiled, never run.** It was written on Linux without a Mac. GitHub's macOS runner built it for the first time on Nov 12 (the release workflow: Apple clang, arm64, macOS 11+, no warnings, ad-hoc signed `.app`, `.dmg`).
+The part with no Apple code in it (`mac/core.cpp`) has 304 checks against a fake operating system (also under ASan + UBSan). `apple.mm`, `app.mm` and `sys_mac.cpp` (AppKit, WKWebView, AVFoundation,
+CoreGraphics, FSEvents, libproc, `codesign`) compile, but nobody has started the app: expect runtime surprises on the first start, and send the `events.log` back.
 
 **Files** (`mac/`)
 

@@ -81,7 +81,7 @@ jobs:
   mac:
     needs: windows               # on a tag the release exists by now: the Mac build can never hold it back
     runs-on: macos-latest
-    continue-on-error: true      # shortcut: the Mac app has never been compiled, so a failed Mac build must not fail the run; remove once it builds
+    continue-on-error: true      # shortcut: the Mac app has never been run (only compiled), so a failed Mac build must not fail the run; remove when somebody has tried it on a Mac
     steps:
       - uses: actions/checkout@v4
       - name: Build the app and the disk image

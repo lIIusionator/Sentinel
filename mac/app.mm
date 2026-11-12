@@ -1,6 +1,6 @@
 // app.mm -- the AppKit shell of the Sentinel Watch Mac app: menu-bar item, dashboard window (a WKWebView showing ui/dashboard.html), toast, AFK screen (AVFoundation).
 // Every decision is made in core.cpp (portable, tested on Linux against a fake); this file only shows the results. Built on a Mac only (mac.mk, -fobjc-arc, macOS 11+).
-// Never compiled or run by whoever wrote it: README section 12 says what to look at first.
+// Compiled by GitHub's macOS runner, never run by whoever wrote it: README section 12 says what to look at first.
 // Rules for this file: no property syntax for names that are C++ keywords (img.template); no NSColor.CGColor (macOS 14+, use CG()); no private API.
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>

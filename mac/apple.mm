@@ -1,5 +1,5 @@
 // apple.mm -- the Apple-framework calls behind apple.h: CoreGraphics (idle time, lock screen), Foundation (launchd plists), FSEvents (new files).
-// Built on a Mac only (mac.mk, -fobjc-arc). Never compiled or run by whoever wrote it: README section 12 says what to look at first.
+// Built on a Mac only (mac.mk, -fobjc-arc). Compiled by GitHub's macOS runner, never run by whoever wrote it: README section 12 says what to look at first.
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreServices/CoreServices.h>

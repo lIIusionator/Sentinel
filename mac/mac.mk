@@ -7,7 +7,7 @@
 #   make tests           the unit tests with the host compiler: 304 checks of the portable core + the strings engine + the command-line tool + autostart
 #   make clean
 # The AFK clips are copied into the app when res/afk_bg_4k60.mp4 and res/afk_bg_lite.mp4 exist (README "The two clips"); without them the AFK screen has no video.
-# The first build has never been run by whoever wrote these rules (no Mac in the sandbox): the Windows side and the portable core are tested, apple.mm / app.mm are not.
+# Compiled without warnings by GitHub's macOS runner (the release workflow) but never RUN by whoever wrote these rules (no Mac in the sandbox): the portable core is tested, apple.mm / app.mm are not.
 
 ARCH     ?= $(shell uname -m)
 MACMIN   ?= 11.0
