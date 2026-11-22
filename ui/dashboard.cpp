@@ -33,7 +33,7 @@ struct Part{ float x,y,vy; int a; };
 static std::vector<Part> g_parts;
 static float g_creatorT=0; static RECT g_rCreator={0,0,0,0};   // Creator hover-zoom
 static int g_evScroll=0;
-static RECT g_evRowR[40]; static std::wstring g_evRowPath[40]; static bool g_evRowWarn[40]={false}; static int g_evRowCount=0;
+static RECT g_evRowR[40]; static std::wstring g_evRowPath[40]; static bool g_evRowWarn[40]={false}, g_evRowStr[40]={false}; static int g_evRowCount=0;
 static RECT g_rFw={0,0,0,0};
 static std::wstring g_devHost,g_devCPU,g_devRAM,g_devRes;      // device info
 struct Note{ const wchar_t* ver; const wchar_t* kind; const wchar_t* text; };
@@ -292,8 +292,8 @@ static void renderScene(HDC dc,int W,int H){
     for(int i=g_evScroll;i<total && i<g_evScroll+rows;i++){ auto&e=evs[i]; bool warn=(e.tag==L"WARN");
       Color tc=C_VIOLET; if(warn)tc=C_RED; else if(e.tag==L"FILE")tc=C_GREEN; else if(e.tag==L"SYS")tc=C_TXM;
       if(g_evRowCount<40){ g_evRowR[g_evRowCount]={(LONG)(cx+12),(LONG)(ry-6),(LONG)(cx+W2-12),(LONG)(ry+32)};
-        g_evRowPath[g_evRowCount]=e.path; g_evRowWarn[g_evRowCount]=warn; g_evRowCount++; }
-      if(warn && hov({(LONG)(cx+12),(LONG)(ry-6),(LONG)(cx+W2-12),(LONG)(ry+32)}))
+        g_evRowPath[g_evRowCount]=e.path; g_evRowWarn[g_evRowCount]=warn; g_evRowStr[g_evRowCount]=(e.tag==L"STR"); g_evRowCount++; }
+      if((warn||e.tag==L"STR") && hov({(LONG)(cx+12),(LONG)(ry-6),(LONG)(cx+W2-12),(LONG)(ry+32)}))
         fillRound(g,cx+12,ry-6,W2-24,38,7,Color(26,248,116,140));
       strokeRound(g,cx+16,ry,52,18,4,tc); drawStr(g,e.tag.c_str(),fMono,tc,cx+22,ry+1);
       { RectF nc(cx+78,ry-4,W2-78-72,36); g.SetClip(nc);
@@ -444,6 +444,11 @@ LRESULT CALLBACK DashProc(HWND h,UINT m,WPARAM w,LPARAM l){
         if((INT_PTR)r<=32) r=ShellExecuteW(0,L"open",L"rundll32.exe",L"shell32.dll,Control_RunDLL firewall.cpl",0,SW_SHOW);
         if((INT_PTR)r<=32) MessageBoxW(h,L"Could not open Windows Firewall settings.",L"Sentinel",MB_OK|MB_ICONWARNING);
         return 0; } }
+    if(g_tab==2){ for(int i=0;i<g_evRowCount;i++) if(inR(g_evRowR[i],x,y) && g_evRowStr[i] && !g_evRowPath[i].empty()){
+      std::wstring m=L"Hold this program?\n\n"+g_evRowPath[i]+L"\n\nIts file is renamed to ...sentinel-held, so it cannot be started (nothing is deleted; rename it back to undo). A copy that is already running keeps running: end it in Task Manager.";
+      if(MessageBoxW(h,m.c_str(),L"Sentinel \u2014 Hold",MB_YESNO|MB_ICONWARNING)==IDYES && !holdFile(g_evRowPath[i]))
+        MessageBoxW(h,L"Could not rename the file (it may be gone, or locked by another program). The details are in events.log.",L"Sentinel \u2014 Hold",MB_OK|MB_ICONWARNING);
+      return 0; } }
     if(g_tab==2){ for(int i=0;i<g_evRowCount;i++) if(inR(g_evRowR[i],x,y) && g_evRowWarn[i] && !g_evRowPath[i].empty()){
       std::wstring m=L"Block this app's internet access using Windows Firewall?\n\n"+g_evRowPath[i]+L"\n\n(You'll get a UAC prompt to apply the rule.)";
       if(MessageBoxW(h,m.c_str(),L"Sentinel \u2014 Firewall",MB_YESNO|MB_ICONWARNING)==IDYES) blockInFirewall(g_evRowPath[i]);

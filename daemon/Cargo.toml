@@ -1,0 +1,14 @@
+# The Sentinel Watch daemon: the "strings" check of a flagged program (links and malware commands inside it), in its own process.
+# std only on purpose: no dependency to audit, nothing to download but the compiler. See daemon/src/main.rs.
+[package]
+name = "sentinel-daemon"
+version = "1.0.0"
+edition = "2021"
+publish = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"   # a bug ends this small process, never the app that started it (the app then scans inside itself)
+strip = true

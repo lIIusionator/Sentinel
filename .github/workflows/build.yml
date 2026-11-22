@@ -54,11 +54,22 @@ jobs:
           fi
       - name: Tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq mingw-w64 g++-mingw-w64-x86-64 nsis
+      - name: Rust daemon (the strings scan as a program of its own, embedded in the exe)
+        run: |
+          # shortcut: soft failure: without the daemon the exe still works (it scans inside itself, and says so in events.log), so a broken Rust step must not stop a release;
+          # upgrade: make it a hard failure once this step has gone green on the runner a few times (it was written where the Windows Rust target could not be downloaded)
+          if ! { rustup target add x86_64-pc-windows-gnu && make daemon CROSS=x86_64-w64-mingw32-; } 2>&1 | tee daemon.log; then
+            echo "::warning::the Rust daemon did not build: the exe is built WITHOUT it (see daemon.log)"; rm -f build/sentinel-daemon.exe
+          fi
       - name: Build the exe, the setup and the checksums
         run: |
           {
             ./build.sh
             if strings -a sentinel.exe | grep -q SW_TEST; then echo "::error::test hooks are in the release exe"; exit 1; fi
+            if [ -f build/sentinel-daemon.exe ]; then
+              strings -a -el sentinel.exe | grep -qx SW_DAEMON || { echo "::error::the daemon was built but is not in the exe"; exit 1; }
+              echo "the Rust daemon is in the exe ($(stat -c %s build/sentinel-daemon.exe) bytes)"
+            else echo "::warning::this exe has NO Rust daemon (it scans inside itself)"; fi
             mkdir -p dist
             cp sentinel.exe dist/SentinelWatch.exe
             makensis -V2 -DEXE="$PWD/dist/SentinelWatch.exe" -DVERSION="$VER" -DOUT="$PWD/dist/SentinelWatch-Setup.exe" installer/windows/sentinel.nsi
@@ -89,7 +100,9 @@ jobs:
         if: always()
         with:
           name: log-windows
-          path: windows.log
+          path: |
+            windows.log
+            daemon.log
 
   mac:
     needs: windows               # the release exists by now: the Mac build can never hold it back

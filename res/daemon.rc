@@ -1,0 +1,3 @@
+/* daemon.rc -- the Rust strings-scan daemon (daemon/), embedded in the exe. The Makefile compiles this file only when build/sentinel-daemon.exe exists
+ * (`make daemon` builds it), so an exe built without Rust simply has no SW_DAEMON resource and scans inside the app. Built with -I build. */
+SW_DAEMON RCDATA "sentinel-daemon.exe"

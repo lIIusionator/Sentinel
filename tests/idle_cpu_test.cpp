@@ -74,11 +74,23 @@ static void cpuChecks(const std::wstring& dir){
   CHECK(log2.size()==before);
 }
 
+// 3. suspiciousExe() (core/trust.cpp) never flags the strings-scan daemon the app itself starts (cache\\sentinel-daemon.exe, unsigned, in a user folder), and still flags everything else there.
+static void daemonChecks(){
+  printf("the daemon is not a suspect\n");
+  g_swVerifyHook=fakeVerify; g_answer=false;               // nothing is signed
+  const std::wstring d=daemonExePath();
+  CHECK(userWritable(d));                                   // without this the checks below would prove nothing (the exemption is for a path the rules would flag)
+  CHECK(!suspiciousExe(d)); CHECK(!suspiciousExe(lc(d)));
+  CHECK(suspiciousExe(d+L".old")); CHECK(suspiciousExe(cacheDir()+L"\\other.exe")); CHECK(suspiciousExe(appDir()+L"\\sentinel-daemon.exe"));   // same name elsewhere, or another file in the cache: still suspects
+  g_swVerifyHook=nullptr;
+}
+
 int main(){
   wchar_t tmp[MAX_PATH]; GetTempPathW(MAX_PATH,tmp);
   std::wstring dir=std::wstring(tmp)+L"sw_idle_cpu_test"; CreateDirectoryW(dir.c_str(),nullptr);
   cacheChecks(dir);
   cpuChecks(dir);
+  daemonChecks();
   printf("%d checks, %d failed\n",g_checks,g_failed);
   return g_failed?1:0;
 }

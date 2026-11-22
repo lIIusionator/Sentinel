@@ -3,7 +3,8 @@
 #   Windows (MinGW in PATH):   mingw32-make
 #   Linux cross-compile:       make CROSS=x86_64-w64-mingw32- -j8
 #
-#   make              sentinel.exe  (everything in one file, the two AFK clips embedded)
+#   make              sentinel.exe  (everything in one file, the two AFK clips embedded; and the Rust daemon, when `make daemon` has been run before)
+#   make daemon       build/sentinel-daemon.exe -- the strings scan as a Rust program of its own (daemon/; needs cargo and `rustup target add x86_64-pc-windows-gnu`); the next `make` embeds it
 #   make dll          media_engine.dll -- the GPU video player on its own, behind the C ABI of media-engine/include/media_engine.h
 #   make TEST=1       sentinel_test.exe -- same sources plus -DSW_TEST_HOOKS (environment switches for smoke tests)
 #   make tests        native unit tests for the pure logic, the Mac command-line tool and (Linux / macOS) the Mac app's core (needs a host g++ and bash, not the cross compiler)
@@ -59,6 +60,10 @@ SRC_ENGINE = media-engine/src/media_engine.cpp
 SRC        = $(SRC_SHARED) $(SRC_CORE) $(SRC_UI) $(SRC_AFK) $(SRC_ENGINE)
 OBJ        = $(patsubst %.cpp,$(BUILD)/%.o,$(SRC))
 RES        = $(BUILD)/res/sentinel.res.o
+# The Rust daemon (daemon/) is optional: `make daemon` builds it, and an exe linked after that carries it (res/daemon.rc). Without it the exe scans inside itself.
+DAEMON_EXE = build/sentinel-daemon.exe
+DAEMON_RES = $(if $(wildcard $(DAEMON_EXE)),$(BUILD)/res/daemon.res.o)
+CARGO     ?= cargo
 
 # The two AFK clips (78 MB) are part of the repository. Say so before anything is compiled if they are missing, whenever the exe is what is being built.
 CLIPS      = res/afk_bg_4k60.mp4 res/afk_bg_lite.mp4
@@ -70,7 +75,7 @@ endif
 
 all: $(OUT)
 
-$(OUT): $(OBJ) $(RES)
+$(OUT): $(OBJ) $(RES) $(DAEMON_RES)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(BUILD)/%.o: %.cpp
@@ -88,6 +93,18 @@ $(RES): res/sentinel.rc res/avatar.jpg $(CLIPS)
 	@mkdir -p $(dir $@)
 	$(WINDRES) -I res -O coff res/sentinel.rc -o $@
 
+# --- the Rust daemon: the strings scan in a process of its own (std only, nothing to download but the compiler) --------------------------------
+# CARGOFLAGS is for a toolchain without the Windows target installed; CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER is the mingw gcc that links it
+$(DAEMON_EXE): daemon/Cargo.toml daemon/src/main.rs daemon/src/scan.rs
+	@mkdir -p $(dir $@)
+	CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=$(CROSS)gcc $(CARGO) build --release $(CARGOFLAGS) --manifest-path daemon/Cargo.toml --target x86_64-pc-windows-gnu --target-dir $(dir $@)daemon-target
+	cp $(dir $@)daemon-target/x86_64-pc-windows-gnu/release/sentinel-daemon.exe $@
+daemon: $(DAEMON_EXE)
+
+$(BUILD)/res/daemon.res.o: res/daemon.rc $(DAEMON_EXE)
+	@mkdir -p $(dir $@)
+	$(WINDRES) -I $(dir $(DAEMON_EXE)) -O coff res/daemon.rc -o $@
+
 # --- the GPU video player as a stand-alone DLL (same sources as the in-exe copy) ---------------------------------------
 dll: media_engine.dll
 media_engine.dll: media-engine/src/media_engine.cpp
@@ -100,6 +117,7 @@ tests:
 	$(BUILD)/afk_tests
 	g++ -std=c++17 -O1 -g -Wall -Wno-misleading-indentation -Icore tests/str_scan_tests.cpp -o $(BUILD)/str_scan_tests
 	$(BUILD)/str_scan_tests
+	@if command -v $(CARGO) >/dev/null 2>&1; then $(CARGO) test --quiet --manifest-path daemon/Cargo.toml --target-dir $(BUILD)/daemon-target && python3 tests/daemon_diff.py $(BUILD); else echo "[daemon] cargo not found: the Rust daemon tests are skipped"; fi
 	bash tests/mac_cli_test.sh $(BUILD)
 	g++ -std=c++17 -O1 -g -Wall -Wextra -Ishared tests/autostart_tests.cpp -o $(BUILD)/autostart_tests
 	$(BUILD)/autostart_tests

@@ -3,6 +3,7 @@
 //   g++ -std=c++17 -O1 -g -Wall -I core tests/str_scan_tests.cpp -o str_scan_tests && ./str_scan_tests
 //   g++ ... -fsanitize=address,undefined ...                                           (memory / UB)
 #include "str_scan.h"
+#include "str_daemon.h"
 #include <cstdio>
 #include <cstdlib>
 
@@ -176,8 +177,51 @@ static void testMacProgram(){
   CHECK(!strscan::isMacProgram(thin64,3)); CHECK(!strscan::isMacProgram(shebang,1)); CHECK(!strscan::isMacProgram(nullptr,0));
 }
 
+static void testDaemonAnswer(){
+  printf("[daemon answer]\n");
+  // what the daemon prints, read back
+  StrReport r; const std::string good="F hl https://discord.com/api/webhooks/1/abc\nF -l http://a.example.org/z\nF -c schtasks /create /tn x\nOK 5 2 3\n";
+  CHECK(strscan::parseAnswer(good,r)); CHECK(r.links==5&&r.commands==2&&r.shown.size()==3);
+  CHECK(r.shown[0].hot&&!r.shown[0].command&&r.shown[0].text=="https://discord.com/api/webhooks/1/abc");
+  CHECK(!r.shown[1].hot&&!r.shown[1].command&&r.shown[2].command&&r.shown[2].text=="schtasks /create /tn x");
+  CHECK(strscan::parseAnswer("OK 0 0 0\n",r)&&r.shown.empty()&&r.links==0);
+  CHECK(strscan::parseAnswer("F -l ftp://a.example.org/a\tb\nOK 1 0 1\n",r)&&r.shown[0].text=="ftp://a.example.org/a\tb");   // a tab is printable
+  // writing and reading again gives the same report, whatever the engine found
+  { StrReport a=runS("https://discord.com/api/webhooks/1/abc http://x.example.org/y schtasks /create /t"); CHECK(!a.shown.empty());
+    StrReport b; CHECK(strscan::parseAnswer(strscan::formatAnswer(a),b)); CHECK(b.links==a.links&&b.commands==a.commands&&b.shown.size()==a.shown.size());
+    for(size_t i=0;i<a.shown.size();i++) CHECK(a.shown[i].text==b.shown[i].text&&a.shown[i].hot==b.shown[i].hot&&a.shown[i].command==b.shown[i].command); }
+  { std::string many; for(int i=0;i<100;i++) many+="http://h"+std::to_string(i)+".example.com/x\n";
+    StrReport a=run(cat({ascii(many),ascii("schtasks /create /tn x")})), b; CHECK(strscan::parseAnswer(strscan::formatAnswer(a),b)&&b.links==100&&b.commands==1&&b.shown.size()==a.shown.size()); }
+  // anything else is refused
+  CHECK(!strscan::parseAnswer("",r));                                                   // nothing
+  CHECK(!strscan::parseAnswer("F -l http://a.example.org/z\n",r));                      // no OK line (a killed daemon)
+  CHECK(!strscan::parseAnswer("F -l http://a.example.org/z\nOK 1 0",r));                // cut off in the OK line
+  CHECK(!strscan::parseAnswer("F -l http://a.example.org/z\nOK 1 0 1",r));              // the last line has no newline
+  CHECK(!strscan::parseAnswer("OK 0 0 0",r));
+  CHECK(!strscan::parseAnswer("ERR cannot read\n",r));
+  CHECK(!strscan::parseAnswer("OK 0 0 0\nOK 0 0 0\n",r));                              // OK is the last line
+  CHECK(!strscan::parseAnswer("OK 0 0 0\nF -l http://a.example.org/z\n",r));
+  CHECK(!strscan::parseAnswer("OK 1 0 1\n",r));                                         // n does not match the F lines
+  CHECK(!strscan::parseAnswer("F -l http://a.example.org/z\nOK 1 0 0\n",r));
+  CHECK(!strscan::parseAnswer("F -l http://a.example.org/z\nOK 0 0 1\n",r));           // it cannot have found less than it shows
+  CHECK(!strscan::parseAnswer("OK -1 0 0\n",r));
+  CHECK(!strscan::parseAnswer("OK 1 0 0 7\n",r));                                       // junk after the numbers
+  CHECK(!strscan::parseAnswer("OK 1 0\n",r));
+  CHECK(!strscan::parseAnswer("F xl http://a.example.org/z\nOK 1 0 1\n",r));            // unknown flag
+  CHECK(!strscan::parseAnswer("F -x http://a.example.org/z\nOK 1 0 1\n",r));
+  CHECK(!strscan::parseAnswer("F hc schtasks /create\nOK 0 1 1\n",r));                  // a command is never hot
+  CHECK(!strscan::parseAnswer("F -l\nOK 1 0 1\n",r));                                    // no text
+  CHECK(!strscan::parseAnswer("F -l \nOK 1 0 1\n",r));
+  CHECK(!strscan::parseAnswer(std::string("F -l http://a.example.org/\x01z\nOK 1 0 1\n"),r));   // not printable
+  CHECK(!strscan::parseAnswer("F -l http://a.example.org/z\r\nOK 1 0 1\n",r));
+  CHECK(!strscan::parseAnswer("garbage\n",r));
+  CHECK(!strscan::parseAnswer("F -l "+std::string(strscan::MAX_TEXT+1,'a')+"\nOK 1 0 1\n",r));   // longer than the engine ever writes
+  { std::string s; for(int i=0;i<(int)strscan::MAX_LINKS+1;i++) s+="F -l http://h"+std::to_string(i)+".example.org/\n"; s+="OK 17 0 17\n"; CHECK(!strscan::parseAnswer(s,r)); }   // more than the cap
+  { std::string s; for(int i=0;i<(int)strscan::MAX_COMMANDS+1;i++) s+="F -c schtasks /create "+std::to_string(i)+"\n"; s+="OK 0 9 9\n"; CHECK(!strscan::parseAnswer(s,r)); }
+}
+
 int main(){
-  testLinks(); testHot(); testIpPort(); testCommands(); testShape(); testMac(); testMacProgram();
+  testLinks(); testHot(); testIpPort(); testCommands(); testShape(); testMac(); testMacProgram(); testDaemonAnswer();
   printf("\n%d checks, %d failed\n",g_checks,g_fail);
   return g_fail?1:0;
 }

@@ -25,4 +25,5 @@ void updateCheckNow();                    // "Check now" button / Automatic upda
 std::wstring updateStatus();              // one line for the Updates tab
 
 void blockInFirewall(const std::wstring& path);   // UAC-elevated netsh rule
+bool holdFile(const std::wstring& path);          // "hold": the program cannot start any more (its file is renamed <name>.sentinel-held; nothing is deleted)
 void stringsScanAsync(const std::wstring& path);  // queue a flagged program for the strings check: links / commands inside it (core/str_scan.cpp)

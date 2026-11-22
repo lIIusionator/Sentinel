@@ -29,6 +29,7 @@ bool endsW(const std::wstring&s,const std::wstring&e){
 std::wstring appDir(){ std::wstring d=envW(L"LOCALAPPDATA"); if(d.empty())d=envW(L"TEMP"); if(d.empty())d=L".";
   d+=L"\\SentinelWatch"; SHCreateDirectoryExW(0,d.c_str(),0); return d; }
 std::wstring cacheDir(){ std::wstring d=appDir()+L"\\cache"; SHCreateDirectoryExW(0,d.c_str(),0); return d; }
+std::wstring daemonExePath(){ return cacheDir()+L"\\sentinel-daemon.exe"; }
 std::wstring logPath(){ return appDir()+L"\\events.log"; }
 
 // The log is written from many threads (watchers, AFK render thread, decode threads). One lock keeps

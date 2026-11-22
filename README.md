@@ -56,7 +56,7 @@ Use 64-bit MinGW-w64 with `g++` and `windres` available on `PATH`:
 mingw32-make
 ```
 
-This produces `sentinel.exe`. To compile the test-hook build, use `mingw32-make TEST=1`; **do not distribute `sentinel_test.exe`**. If you do not have a compiler, `build_portable.bat` downloads a portable toolchain and builds without installing it.
+This produces `sentinel.exe`. To embed the Rust daemon, install Rust with `rustup target add x86_64-pc-windows-gnu`, run `mingw32-make daemon` and then `mingw32-make` again; without it the executable scans inside itself. To compile the test-hook build, use `mingw32-make TEST=1`; **do not distribute `sentinel_test.exe`**. If you do not have a compiler, `build_portable.bat` downloads a portable toolchain and builds without installing it.
 
 ### Linux (Windows cross-build)
 
@@ -87,7 +87,7 @@ Run the repository's native test suite with:
 make tests
 ```
 
-The tests cover portable logic, including AFK timing and tier selection, strings scanning, startup behavior, update rules and the macOS app's portable core. Platform-specific behavior should also be tested on the corresponding real operating system; Wine results do not replace Windows or macOS hardware testing.
+The tests cover portable logic, including AFK timing and tier selection, strings scanning (the C++ engine and the Rust daemon, which are compared on thousands of files when `cargo` is installed), startup behavior, update rules and the macOS app's portable core. Platform-specific behavior should also be tested on the corresponding real operating system; Wine results do not replace Windows or macOS hardware testing.
 
 Other build and test targets are documented in the Makefile and `CLAUDE.md`. Do not ship test builds or enable test hooks in release builds.
 
@@ -99,6 +99,7 @@ The code is organized around shared portable logic and OS-specific integrations:
 |---|---|
 | `shared/` | Common utilities, settings, platform selection, startup and power-saving rules, and update logic. |
 | `core/` | Windows monitoring, trust checks, event handling, strings scanning and updater integration. |
+| `daemon/` | Rust daemon (standard library only): the strings scan in a process of its own. |
 | `ui/` | Windows tray, dashboard, notifications and graphics. |
 | `afk/` | Windows AFK screen lifecycle, video backends, assets and portable rendering/timing logic. |
 | `media-engine/` | D3D11 and Media Foundation video player exposed through a C ABI. |
@@ -115,14 +116,15 @@ The Windows updater downloads releases from this repository and verifies the exe
 
 The applications are **not code-signed**. HTTPS and a release checksum help detect transfer errors or a mismatched download, but cannot protect against a compromised GitHub account or malicious release. Only install releases you trust. Automatic updating requires this repository to be public.
 
-The strings scan reads file content only; it does not execute programs or fetch detected links. Findings are leads for investigation, not a malware verdict. Scans are bounded in size and may not see packed, encrypted or non-text content.
+The strings scan reads file content only; it does not execute programs or fetch detected links. The file is read and parsed by the Rust daemon in a restricted job object, so a hostile file is not parsed inside the application. In the Events tab, a strings-scan result can be **held** after you confirm: the file is renamed to `<name>.sentinel-held` so it cannot be started (rename it back to undo; nothing is deleted). Findings are leads for investigation, not a malware verdict. Scans are bounded in size and may not see packed, encrypted or non-text content.
 
 ## Known limitations
 
 - The Windows executable has not been validated on real Windows hardware with a real GPU. Smooth 4K playback, audio, GPU selection, power-plan changes and display brightness need testing on actual devices.
 - The macOS app compiled on GitHub's macOS runner but has **never been launched on a Mac**. Runtime behavior, permissions, Gatekeeper handling and disk-image installation are not yet confirmed.
 - The macOS build is ad-hoc signed and not notarized. It does not include the Windows automatic updater or power-saving feature.
-- The Rust daemon and named pipe from the original architecture design are not implemented; monitoring runs in the application.
+- Only the strings scan runs in the Rust daemon (a separate program inside the executable; if it cannot run, the application scans by itself). The rest of the monitoring runs in the application, and the named pipe from the original architecture design is not implemented.
+- The daemon is an executable that the application unpacks and starts, which an antivirus may treat with suspicion. The job-object limits that confine it (one process, a memory cap) were written for Windows but have not been run on real Windows.
 
 ## License and third-party assets
 

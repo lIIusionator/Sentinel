@@ -65,6 +65,7 @@ inline std::filesystem::path wpath(const std::wstring& p){ return std::filesyste
 
 std::wstring appDir();                    // %LOCALAPPDATA%\SentinelWatch (created on demand)
 std::wstring cacheDir();
+std::wstring daemonExePath();             // where the strings-scan daemon (daemon/, core/str_scan.cpp) is unpacked to: cache\sentinel-daemon.exe
 std::wstring logPath();                   // events.log
 
 // Thread-safe, timestamped line appended to events.log.

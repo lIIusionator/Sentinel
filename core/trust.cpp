@@ -64,6 +64,7 @@ bool isSigned(const std::wstring& path){
 bool suspiciousExe(const std::wstring& path){
   if(path.empty())return false;
   if(!userWritable(path))return false;
+  if(lc(path)==lc(daemonExePath()))return false;     // our own strings-scan daemon (unsigned, in the cache folder): core/str_scan.cpp rewrites it from the exe before every run
   return !isSigned(path);
 }
 // Filenames a token/credential stealer copies out of Discord / browsers. Seeing

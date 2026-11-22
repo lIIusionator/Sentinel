@@ -18,19 +18,21 @@ README.md has the user-facing description; this file is for whoever (human or AI
   (the GPU?), change `shared/eco.h` and `core/eco.cpp`.
 * (Nov 9-12) Put the project on GitHub (`lIIusionator/Sentinel`, MIT, `LICENSE` / `THIRD_PARTY.md`), a Windows setup (`installer/windows/sentinel.nsi`), a Mac dmg (best effort), **release v1.0** and
   **automatic updates from the repository's releases** (rule 16, README section 13). The repository must be public for the updates to work; making it public is the owner's decision.
-* The Rust daemon and the named pipe of the architecture document are **not** implemented; say so, once, when it matters.
+* (Nov 15-16) "Build in Rust?" -> **yes, a small daemon**: the strings scan runs in a Rust program of its own (`daemon/`, rule 17), and a **Hold** button for what it finds (rule 18, "add new mechanic for protecting"). The rest of the monitoring is still C++ in the app, and the named pipe of the architecture document is not implemented (one process per file, answer on stdout); say so, once, when it matters.
 
 ## Commands
 ```
 mingw32-make                 # sentinel.exe (release). First build is slow: windres embeds 77 MB of video.
                              # res/afk_bg_4k60.mp4 + res/afk_bg_lite.mp4 must exist (they are in the repository: README "The two clips"; tools\make_clips.bat makes new ones)
 mingw32-make TEST=1          # sentinel_test.exe  (-DSW_TEST_HOOKS; env switches in afk/afk_controller.h). Never ship it.
-make tests                   # native unit tests, host g++ + bash:  62,579 (afk) + 113 (strings engine) + 21 (Mac tool, tests/mac_cli_test.sh) + 13 (autostart) + 43 (power saving) + 115 (updater) checks must pass,
+make tests                   # native unit tests, host g++ + bash:  62,579 (afk) + 151 (strings engine + the daemon's answer format) + 12 (Rust, `cargo test` of daemon/) + tests/daemon_diff.py (Rust vs C++ on 1,564 files) + 21 (Mac tool, tests/mac_cli_test.sh) + 13 (autostart) + 43 (power saving) + 115 (updater) checks must pass,
                              # and on Linux / macOS 304 more for the Mac app's portable core (tests/mac_logic_tests.cpp)
 make macarm                  # mac/sentinel-strings.cpp for Apple Silicon: ZIG=<path to zig 0.17> (`pip install ziglang`); never run here, only inspected (llvm-objdump)
 make harness                 # harness.exe: CPU decode worker vs a scripted fake reader (Windows / Wine): 81 checks
 make pathtest                # path_unicode_test.exe: non-ASCII account names: 84 checks
-make idletest                # idle_cpu_test.exe (Windows / Wine): signed-file cache in isSigned + the [CPU] log line: 22 checks
+make idletest                # idle_cpu_test.exe (Windows / Wine): signed-file cache in isSigned + the [CPU] log line + the daemon is not a suspect: 28 checks
+make daemon                  # build/sentinel-daemon.exe (cargo + `rustup target add x86_64-pc-windows-gnu`); the NEXT `make` embeds it (res/daemon.rc). Without it the exe scans inside itself.
+tests/daemon_e2e.sh EXE      # the daemon under Wine: scans, repair, parity with the in-app scan, lying / crashing / hung / child-starting daemons, Hold (EXE = a TEST=1 build made after `make daemon`)
 make dll                     # media_engine.dll (C ABI exports MediaEngine_*)
 tests/update_e2e.sh OLD NEW  # the automatic update under Wine against a fake release server (README section 13 builds the two test exes)
 tests/installer_test.sh      # the Windows setup under Wine, silent (needs Wine with 32-bit support: the NSIS setup is a 32-bit program)
@@ -83,7 +85,7 @@ Expect **0 warnings** with `-Wall -Wextra` (the Makefile switches off `-Wmislead
     `core/str_scan.cpp` is the Windows glue: the watchers that flag an unsigned program (`file_watch`, `proc_watch` both paths, `token_guard`) call `stringsScanAsync(path)`; it queues
     (32 max), and ONE below-normal thread, alive only while the queue is not empty, waits for the file to stop growing, reads <=16 MB (first + last 8 MB), reports `[STR]` lines +
     an `STR` event + a toast, and remembers (path, size, time) so the same file is not read twice. It never runs or fetches anything and never throws out of the thread. A new pattern
-    (`CMDS`, `HOT`, `NOISE`) needs a test, and a command pattern must not match what honest programs carry (the pair `a`+`b` must both be in ONE printable run). A hit is a lead, not a verdict.
+    (`CMDS`, `HOT`, `NOISE`) needs a test, and a command pattern must not match what honest programs carry (the pair `a`+`b` must both be in ONE printable run). A hit is a lead, not a verdict. Since Nov 16 the reading and parsing is done by the Rust daemon (rule 17); `strscan::scan` is the fallback and the reference.
 13. **Power saving when away** (Nov 7, build `2026.11.07-afk4`). The rules (when it starts, when it stops, what happens when a step fails) are pure logic in `shared/eco.h` over the small `EcoSys` interface, with 43 checks in
     `tests/eco_tests.cpp` (fake plans, fake marker); `core/eco.cpp` is the Windows side. The numbers are constants in eco.h: `ECO_AFTER_MS` 30 min, `ECO_CPU_MAX_PCT` 25 (a `static_assert` keeps it under 30),
     `ECO_BRIGHT_PCT` 15. It works on a temporary COPY of the active power plan ("Sentinel Watch power saving (temporary)": CPU max 25 %, min <= 5 %, boost off, idle states allowed, brightness <= 15 %) and activates it;
@@ -107,6 +109,17 @@ Expect **0 warnings** with `-Wall -Wextra` (the Makefile switches off `-Wmislead
     input idle >= 60 s; every failing step puts the old exe back. **Release procedure:** change `SW_VERSION`, push to main: the workflow publishes `<SW_VERSION>` when it has no release yet (it creates the tag itself; a tag pushed by hand must equal `SW_VERSION`, the workflow checks it, or an installed copy would download the release again and again);
     assets `SentinelWatch.exe`, `SentinelWatch-Setup.exe`, `SHA256SUMS.txt`; the repository must be public (a private one answers 404). Test hooks (sentinel_test.exe only; plain http only there): `SW_TEST_UPDATE_URL`,
     `SW_TEST_UPDATE_FIRST` (ms), `SW_TEST_UPDATE_IDLE` (s). Never run: real HTTPS / TLS to api.github.com and github.com, the swap with a real antivirus holding the file, a failing swap (the rollback code has no test), a real release.
+
+17. **Rust daemon** (Nov 16). `daemon/` is a std-only Rust program (`sentinel-daemon scan <file>`): `scan.rs` is a line-by-line port of `core/str_scan.h` (same lists, same order), `main.rs` reads the file as the app does (<= 16 MB, or first + last 8 MB with 8 zero bytes) and prints
+    `F <h|-><c|l> <text>` lines and a last `OK <links> <commands> <n>` line (`core/str_daemon.h` writes and parses exactly that; the parser refuses anything else). **Whatever changes in `str_scan.h` (a list entry, a rule) must change in `scan.rs`**:
+    `tests/daemon_diff.py` compares the three lists and the output on 1,564 generated / real / >16 MB files (a mutation of the Rust port is caught: checked). `make daemon` builds it, the next `make` embeds it as resource `SW_DAEMON` (`res/daemon.rc`);
+    `core/str_scan.cpp` unpacks it to `cache\sentinel-daemon.exe` and **compares it with the resource before EVERY run** (an update brings a new one, a replaced file is overwritten), then starts it in a **job object**
+    (one process only, 512 MB, kill-on-close, created suspended, no console, below normal, killed after 60 s). Anything wrong (no resource, cannot start, hang, exit code != 0, an answer that is not exactly the format) -> `[STR] no daemon (<why>): scanning <file> inside the app`
+    and the same check runs in the app (parity is a test). `suspiciousExe` never flags the daemon's own path (`daemonExePath()`), or every scan would raise "Unsigned app in user folder". Test hooks (test exe only): `SW_TEST_DAEMON=off|<exe>`, `SW_TEST_DAEMON_WAIT=<ms>`.
+    The CI step is a **soft** failure on purpose (the exe still works without the daemon); make it hard once it has been green on the runner. An exe that unpacks and starts another exe can look like a dropper to an antivirus: if one quarantines the daemon file, the log says `no daemon` and scanning goes on in the app.
+18. **Hold** (Nov 16, the "new protecting mechanic"). Clicking a strings-scan row (`STR`) in the Events tab asks "Hold this program?"; yes -> `holdFile()` (core/response.cpp) renames the file to `<name>.sentinel-held` (never over another file, nothing deleted, `[HOLD]` log line
+    with how to undo). Only after a yes, never automatically (a hit is a lead: the user's own unsigned tools carry webhooks too). A copy that is already running keeps running. No list of released files: a file renamed back may be offered again after a new scan.
+    `SW_TEST_HOLD=1` (test exe) holds what the scan finds, to test `holdFile` without clicking. The prompt and the click itself were never run (no Windows, no mouse here).
 
 ## Verified here, and not
 Verified (Linux, mingw-w64 GCC 13 win32-model cross compiler, Wine 9.0, Zig 0.17 clang): clean builds, C++20/23 syntax, 62,579 native checks (also
@@ -133,6 +146,8 @@ starts while it is on skips the video check; the early player and the video chec
 geometry only (this Wine draws no text).
 Nov 11 (v1.0), Linux / Wine only: updater (115 logic checks, also ASan + UBSan; Wine end to end: install, wrong checksum, cut-off download, same version, pre-release, 404, switch off, dashboard open) and the Windows
 setup (silent install / uninstall under 32-bit-capable Wine; its pages were not clicked). The GitHub workflow's first run on `main` passed (tests 62,579 + 113 + 21 + 13 + 43 + 115 + 304, Windows exe + setup with 0 warnings, Mac app + dmg with 0 warnings); its release step has not run yet.
+Nov 16 (Rust daemon + Hold), Linux / Wine only: Rust unit tests (12) and `tests/daemon_diff.py` (the three lists equal; 1,564 files identical bytes C++ vs Rust, incl. Wine's real DLLs and files over 16 MB; two deliberate bugs in the port were caught); the Windows daemon exe (331 KB, system DLLs only) runs under Wine and prints the same bytes; `tests/daemon_e2e.sh` under Wine with the real file-watch trigger: scan through the daemon, repair of a damaged copy, parity with the in-app scan, a lying / crashing / hung stand-in daemon (noticed, app scans itself, the hung one is killed), Hold; the release exe has the resource, no `SW_TEST` string, no new DLL.
+**Not verified:** this Wine does not enforce the job's ActiveProcessLimit or memory limit (the stand-ins that start a child / take 900 MB were allowed), so on real Windows those two limits and the start of a console-subsystem exe as `DETACHED_PROCESS` inside such a job have never run; whether an antivirus objects to an exe that unpacks and starts another exe; the Events-tab prompt of Hold; the CI Rust step (the sandbox could not download the Windows Rust target: the daemon was built here with Ubuntu's rustc 1.97 + `-Z build-std`, CI uses rustup's prebuilt target).
 **Never run:** whether the early player + video check cure the "sometimes no video" symptom on the laptop (their cause there was never reproduced), whether 4 frames in 4.5 s is the right bar on the GTX 1050
 (a false FAIL costs one rebuild, then maybe a tier; the log line says which), a real GPU stuck in the way `SW_TEST_STUCK` imitates (that hook only imitates it); the strings scan on real Windows with real droppers; the Mac tool on a Mac (Gatekeeper / quarantine, `std::filesystem` there); **the Mac app** (compiled by the v1.0 workflow, never started: apple.mm, app.mm, sys_mac.cpp); the real `powrprof.dll` calls (Wine has none: whether a standard account may copy and switch power plans, whether the screen really dims and the CPU stays at 25 %, what AtlasOS's plan does with the values, how long the calls take on the UI thread); the text of the 11th Protection-tab row; real GPU decode / present of the 4K60 clip, whether renewing the player cures the 2nd-screen symptom on the laptop, how long a rebuild takes on the GTX 1050, the D2D HUD, audio, loop seam, display-off / lock, which adapter is picked, GCC 16.1 build, and the real cost of
 WinVerifyTrust on 100 MB signed exes (Wine has none): that the signature cache is what removed the always-on CPU use on the laptop is a diagnosis, not a measurement.
@@ -158,6 +173,8 @@ Do not claim any of those works until the log from the real laptop says so.
    means the functions are missing.
 
 ## Wine notes (Linux sandbox only)
+Building the daemon here (static.rust-lang.org is not reachable, so `rustup target add` fails): `apt install rustc-1.97 cargo-1.97 rust-1.97-src`; Debian's std source lacks the `windows-link` dependency, so add `[target.'cfg(windows)'.dependencies]` / `windows-link = { path = "../windows_link" }` to `/usr/src/rustc-1.97.1/library/std/Cargo.toml`; then
+`RUSTC=/usr/bin/rustc-1.97 RUSTC_BOOTSTRAP=1 make daemon CROSS=x86_64-w64-mingw32- CARGO=/usr/bin/cargo-1.97 CARGOFLAGS="-Z build-std=std,panic_abort"`. A stand-in daemon written in C must set stdout to binary mode (`_setmode(1,_O_BINARY)`), or its `\n` becomes `\r\n` and the parser refuses it.
 `Xvfb :77`, `WINEPREFIX=...`, `DISPLAY=:77`, `LANG=C.UTF-8 LC_ALL=C.UTF-8` (a POSIX locale cannot create non-ASCII file names). Wine **ignores a `LOCALAPPDATA` given
 from the shell** (use the Unicode-path test instead). Wine's Media Foundation cannot negotiate RGB32, so the CPU tier there ends in "no video"; its D3D11 is
 a fake, slow NVIDIA adapter; `GetLastInputInfo` changes when a window activates. `wineserver -k` between runs; processes outlive `timeout`.
@@ -165,6 +182,6 @@ a fake, slow NVIDIA adapter; `GetLastInputInfo` changes when a window activates.
 ## Not done (ideas, in the order they would matter)
 The Mac app: compile it and fix what the first build says; power saving, a video check and tiers there; a signed / notarised build; Endpoint Security (needs an Apple entitlement). Power saving on Windows: pausing the AFK video while
 it is on, looking at more than input, power calls off the UI thread;
-the strings scan reading the middle of a >16 MB file and persisting its "already read" memory; signature check in the Mac tool.
+the strings scan reading the middle of a >16 MB file and persisting its "already read" memory; signature check in the Mac tool; Hold: a list of released files, ending a running copy, a switch row for an automatic hold (default off); more watchers in the daemon (the named pipe), a Rust daemon for the Mac app.
 Waitable swap chain / `DXGI_ERROR` resource-lost handling beyond device loss; HUD brush reuse in the D2D overlay; two GPU back-ends alive at once; a downscaled
-copy for a user's own clip; the Rust daemon and the pipe from the architecture document.
+copy for a user's own clip; moving the process / file watchers into the daemon with the named pipe from the architecture document.
