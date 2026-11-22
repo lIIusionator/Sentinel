@@ -1,0 +1,17 @@
+[OS] Darwin
+mkdir -p build-mac
+clang++ -std=c++17 -O2 -arch arm64 -mmacosx-version-min=11.0 -Wall -Wextra -Wno-misleading-indentation -Wno-unused-parameter -Icore -Imac -Ishared -MMD -MP -c mac/core.cpp -o build-mac/core.o
+clang++ -std=c++17 -O2 -arch arm64 -mmacosx-version-min=11.0 -Wall -Wextra -Wno-misleading-indentation -Wno-unused-parameter -Icore -Imac -Ishared -MMD -MP -c mac/sys_mac.cpp -o build-mac/sys_mac.o
+clang++ -std=c++17 -O2 -arch arm64 -mmacosx-version-min=11.0 -Wall -Wextra -Wno-misleading-indentation -Wno-unused-parameter -Icore -Imac -Ishared -MMD -MP -fobjc-arc -c mac/apple.mm -o build-mac/apple.o
+clang++ -std=c++17 -O2 -arch arm64 -mmacosx-version-min=11.0 -Wall -Wextra -Wno-misleading-indentation -Wno-unused-parameter -Icore -Imac -Ishared -MMD -MP -fobjc-arc -c mac/app.mm -o build-mac/app.o
+rm -rf build-mac/SentinelWatch.app
+mkdir -p build-mac/SentinelWatch.app/Contents/MacOS build-mac/SentinelWatch.app/Contents/Resources/ui build-mac/SentinelWatch.app/Contents/Resources/content
+clang++ -std=c++17 -O2 -arch arm64 -mmacosx-version-min=11.0 -Wall -Wextra -Wno-misleading-indentation -Wno-unused-parameter -Icore -Imac -Ishared -MMD -MP build-mac/core.o build-mac/sys_mac.o build-mac/apple.o build-mac/app.o -framework Cocoa -framework WebKit -framework AVFoundation -framework QuartzCore -framework CoreServices -framework CoreGraphics -framework Foundation -pthread -o build-mac/SentinelWatch.app/Contents/MacOS/SentinelWatch
+sed 's/@VERSION@/1.0/g' mac/Info.plist > build-mac/SentinelWatch.app/Contents/Info.plist
+cp mac/ui/dashboard.html res/avatar.jpg build-mac/SentinelWatch.app/Contents/Resources/ui/
+cp mac/content/afk.txt mac/content/facts.txt mac/content/quotes.txt build-mac/SentinelWatch.app/Contents/Resources/content/
+codesign --force --sign - build-mac/SentinelWatch.app
+build-mac/SentinelWatch.app: replacing existing signature
+built build-mac/SentinelWatch.app (arch arm64, macOS 11.0+). Start it: open build-mac/SentinelWatch.app
+created: /Users/runner/work/Sentinel/Sentinel/SentinelWatch-macOS.dmg
+made SentinelWatch-macOS.dmg

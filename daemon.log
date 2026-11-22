@@ -1,0 +1,6 @@
+info: downloading component rust-std
+[OS] Linux
+CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc cargo build --release  --manifest-path daemon/Cargo.toml --target x86_64-pc-windows-gnu --target-dir build/daemon-target
+   Compiling sentinel-daemon v1.0.0 (/home/runner/work/Sentinel/Sentinel/daemon)
+    Finished `release` profile [optimized] target(s) in 9.29s
+cp build/daemon-target/x86_64-pc-windows-gnu/release/sentinel-daemon.exe build/sentinel-daemon.exe
